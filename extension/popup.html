@@ -2,11 +2,16 @@
  <head>
  </head>
  <body>
-  <div style="width: 400px; height: 400px;">
-    HELLO WORLD
-    <select id="ports"></select>
-    <button id="on">ON</button>
-    <button id="off">OFF</button>
+  <div id="app" style="width: 400px; height: 400px;">
+    <div id="meta">
+      Select Serial Port:
+      <select id="ports_menu"></select>
+    </div>
+    <div id="monitor">
+      <div id="fromdevice_data" style="height: 250px; border: 1px solid #999999;"></div>
+      <input id="todevice_data" type="text" style="border: 1px solid #999999;">
+      <button id="send_button" style="border: 1px solid #999999; background: white;">Send</button>
+    </div>
   </div>
   <script src="usb.js"></script>
  </body>

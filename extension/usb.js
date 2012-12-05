@@ -1,19 +1,109 @@
-var VENDOR_ID = 0x0403;
-var PRODUCT_ID = 0x6001;
+var kDebugNone = 0;
+var kDebugNormal = 1;
+var kDebugFine = 2;
+var debugLevel = kDebugNormal;
 
-console.log("-- BEGIN --");
+var kBitrate = 9600; // TODO(mrjones): make a UI option
+var kUnconnected = -1;
+var connectionId_ = kUnconnected;
 
-document.getElementById("on").addEventListener('click', function() { serial(true); });
-document.getElementById("off").addEventListener('click', function() { serial(false); });
-
-
-
-var deviceOptions = {
-//  onEvent: function(usbEvent) {
-//    console.log("USB EVENT: " + usbEvent);
-//  }
+function log(level, message) {
+  if (level >= debugLevel) { console.log(message); }
 }
 
+log(kDebugFine, "-- BEGIN --");
+document.getElementById("send_button").addEventListener('click', sendButtonClicked);
+
+function sendButtonClicked() {
+  if (connectionId_ == kUnconnected) {
+    connectToSelectedSerialPort(doSend);
+  } else {
+    doSend();
+  }
+}
+
+function serialOpenDone(openArg, doneCallback) {
+  log(kDebugFine, "ON OPEN:" + JSON.stringify(openArg));
+  if (!openArg || openArg.connectionId == -1) {
+    console.log("ERROR COULD NOT OPEN CONNECTION");
+    return;
+  }
+  connectionId_ = openArg.connectionId;
+  log(kDebugNormal, "CONNECTION ID: " + connectionId_);
+  doneCallback();
+}
+
+function connectToSelectedSerialPort(doneCallback) {
+  var portMenu = document.getElementById("ports_menu");
+  var selectedPort = portMenu.options[portMenu.selectedIndex].text;
+  log(kDebugNormal, "Using port: " + selectedPort);
+  var callbackFn = function(openArg) { serialOpenDone(openArg, doneCallback); };
+  chrome.serial.open(selectedPort, {bitrate: kBitrate}, callbackFn);
+}
+
+function doSend() {
+  var input = document.getElementById("todevice_data");
+  var data = input.value;
+  input.value = "";
+
+  log(kDebugNormal, "SENDING " + data + " ON CONNECTION: " + connectionId_);
+  chrome.serial.write(connectionId_, stringToBinary(data), sendDone);
+}
+
+function sendDone(sendArg) {
+  log(kDebugFine, "SENT " + sendArg.bytesWritten + " BYTES ON CONN: " + connectionId_);
+}
+
+function stringToBinary(str) {
+  var buffer = new ArrayBuffer(str.length);
+  var bufferView = new Uint8Array(buffer);
+  for (var i = 0; i < str.length; i++) {
+    bufferView[i] = str.charCodeAt(i);
+  }
+
+  return buffer;
+}
+
+function onSerialClose(closeArg) {
+  log(kDebugFine, "ON CLOSE: " + JSON.stringify(closeArg));
+}
+
+function onSerialFlush(flushArg) {
+  log(kDebugFine, "ON FLUSH: " + JSON.stringify(flushArg));
+}
+
+function onSerialWrite(writeArg) {
+  log(kDebugFine, "ON WRITE:" + JSON.stringify(writeArg));
+  chrome.serial.flush(connectionId_, onSerialFlush);
+}
+
+function detectPorts() {
+  var menu = document.getElementById("ports_menu");
+  menu.options.length = 0;
+  chrome.serial.getPorts(function(ports) {
+    for (var i = 0; i < ports.length; ++i) {
+      log(kDebugFine, ports[i]);
+      var portOpt = document.createElement("option");
+      portOpt.text = ports[i];
+      menu.add(portOpt, null);
+    }
+  });
+}
+
+detectPorts();
+
+
+var val_;
+function serial(val) {
+  val_ = val;
+}
+
+//serial(false);
+
+/*
+
+Code for talking over USB, the chrome.serial seems to be working better for now
+but maybe come back to this.
 
 var usb;
 if (chrome.experimental && chrome.experimental.usb) {
@@ -25,70 +115,21 @@ if (chrome.experimental && chrome.experimental.usb) {
 }
 
 var device_;
-var connectionId_;
 
-function data() {
-  var buffer = new ArrayBuffer(1);
-  var bufferView = new Uint8Array(buffer);
-//  for (var i = 0; i < str.length; i++) {
-//    bufferView[i] = str.charCodeAt(i);
+
+// Info is for Arduino Duemilanove
+// TODO(mrjones): Make this work with other boards
+var VENDOR_ID = 0x0403;
+var PRODUCT_ID = 0x6001;
+
+
+var deviceOptions = {
+//  onEvent: function(usbEvent) {
+//    console.log("USB EVENT: " + usbEvent);
 //  }
-
-  bufferView[0] = val_;
-
-  return buffer;
 }
 
-function onSerialClose(closeArg) {
-  console.log("ON CLOSE: " + JSON.stringify(closeArg));
-}
 
-function onSerialFlush(flushArg) {
-  console.log("ON FLUSH: " + JSON.stringify(flushArg));
-//  chrome.serial.close(connectionId_, onSerialClose);
-}
-
-function onSerialWrite(writeArg) {
-  console.log("ON WRITE:" + JSON.stringify(writeArg));
-  chrome.serial.flush(connectionId_, onSerialFlush);
-}
-
-function onSerialOpen(openArg) {
-  console.log("ON OPEN:" + JSON.stringify(openArg));
-
-  connectionId_ = openArg.connectionId;
-  console.log("CONNECTION ID: " + JSON.stringify(connectionId_));
-
-  chrome.serial.write(connectionId_, data(), onSerialWrite);
-}
-
-function detectPorts() {
-  var menu = document.getElementById("ports");
-  menu.options.length = 0;
-  chrome.serial.getPorts(function(ports) {
-    for (var i = 0; i < ports.length; ++i) {
-      console.log(ports[i]);
-      var portOpt = document.createElement("option");
-      portOpt.text = ports[i];
-      menu.add(portOpt, null);
-    }
-  });
-}
-
-detectPorts();
-
-var val_;
-function serial(val) {
-  val_ = val;
-  var portMenu = document.getElementById("ports");
-  var port = portMenu.options[portMenu.selectedIndex].text;
-  console.log("Using port: " + port);
-  chrome.serial.open(port, {bitrate: 9600}, onSerialOpen);
-}
-
-//serial(false);
-
-/*
 usb.findDevice(
   VENDOR_ID,
   PRODUCT_ID,
