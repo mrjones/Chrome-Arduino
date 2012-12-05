@@ -14,6 +14,21 @@ function log(level, message) {
 log(kDebugFine, "-- BEGIN --");
 document.getElementById("send_button").addEventListener('click', sendButtonClicked);
 
+function detectPorts() {
+  var menu = document.getElementById("ports_menu");
+  menu.options.length = 0;
+  chrome.serial.getPorts(function(ports) {
+    for (var i = 0; i < ports.length; ++i) {
+      log(kDebugFine, ports[i]);
+      var portOpt = document.createElement("option");
+      portOpt.text = ports[i];
+      menu.add(portOpt, null);
+    }
+  });
+}
+
+detectPorts();
+
 function sendButtonClicked() {
   if (connectionId_ == kUnconnected) {
     connectToSelectedSerialPort(doSend);
@@ -30,6 +45,7 @@ function serialOpenDone(openArg, doneCallback) {
   }
   connectionId_ = openArg.connectionId;
   log(kDebugNormal, "CONNECTION ID: " + connectionId_);
+  scheduleRepeatingRead();
   doneCallback();
 }
 
@@ -64,6 +80,37 @@ function stringToBinary(str) {
   return buffer;
 }
 
+function binaryToString(buffer) {
+  var bufferView = new Uint8Array(buffer);
+  var chars = [];
+  for (var i = 0; i < bufferView.length; ++i) {
+    chars.push(bufferView[i]);
+  }
+
+  return String.fromCharCode.apply(null, chars);
+}
+
+function scheduleRepeatingRead() {
+  setTimeout(tryRead, 1000);
+}
+
+function tryRead() {
+  chrome.serial.read(connectionId_, 1, readDone);
+}
+
+function readDone(readArg) {
+  if (readArg && readArg.bytesRead > 0 && readArg.data) {
+    var str = binaryToString(readArg.data);
+    console.log("READ:" + str);
+    tryRead();
+  } else {
+    scheduleRepeatingRead();
+  }
+}
+
+
+// UNUSED RIGHT NOW//
+
 function onSerialClose(closeArg) {
   log(kDebugFine, "ON CLOSE: " + JSON.stringify(closeArg));
 }
@@ -71,34 +118,6 @@ function onSerialClose(closeArg) {
 function onSerialFlush(flushArg) {
   log(kDebugFine, "ON FLUSH: " + JSON.stringify(flushArg));
 }
-
-function onSerialWrite(writeArg) {
-  log(kDebugFine, "ON WRITE:" + JSON.stringify(writeArg));
-  chrome.serial.flush(connectionId_, onSerialFlush);
-}
-
-function detectPorts() {
-  var menu = document.getElementById("ports_menu");
-  menu.options.length = 0;
-  chrome.serial.getPorts(function(ports) {
-    for (var i = 0; i < ports.length; ++i) {
-      log(kDebugFine, ports[i]);
-      var portOpt = document.createElement("option");
-      portOpt.text = ports[i];
-      menu.add(portOpt, null);
-    }
-  });
-}
-
-detectPorts();
-
-
-var val_;
-function serial(val) {
-  val_ = val;
-}
-
-//serial(false);
 
 /*
 
