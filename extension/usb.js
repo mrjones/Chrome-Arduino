@@ -101,7 +101,9 @@ function tryRead() {
 function readDone(readArg) {
   if (readArg && readArg.bytesRead > 0 && readArg.data) {
     var str = binaryToString(readArg.data);
-    console.log("READ:" + str);
+    str.replace("\n", "<br/>");
+    // XSS like woah, but who cares.
+    document.getElementById("fromdevice_data").innerHTML += str;
     tryRead();
   } else {
     scheduleRepeatingRead();
