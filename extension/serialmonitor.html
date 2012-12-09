@@ -1,0 +1,24 @@
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="serialmonitor.css">
+  </head>
+  <body>
+      <div id="config" class="section">
+        <div id="ports">
+          Serial Port:
+          <select id="ports_menu"></select>
+        </div>
+        <button id="connect">Connect</button>
+        <button id="disconnect">Disconnect</button>
+        <button id="ports_refresh">Refresh Port List</button>
+      </div>
+      <div id="serialmonitor" class="section">
+        <div id="fromdevice_data"></div>
+        <input id="todevice_data" type="text">
+        <button id="todevice_send">Send</button>
+       </div>
+     </div>
+     <div id="status" class="section"></div>
+   <script src="usb.js"></script>
+  </body>
+</html>

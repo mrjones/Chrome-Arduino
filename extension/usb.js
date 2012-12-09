@@ -1,18 +1,70 @@
-var kDebugNone = 0;
+var kDebugError = 0;
 var kDebugNormal = 1;
 var kDebugFine = 2;
 var debugLevel = kDebugNormal;
 
 var kBitrate = 9600; // TODO(mrjones): make a UI option
 var kUnconnected = -1;
+
+// Current State
 var connectionId_ = kUnconnected;
+
+var ids = {
+  connectButton: "connect",
+  disconnectButton: "disconnect",
+  refreshPortsButton: "ports_refresh",
+  refreshPortsMenu: "ports_menu",
+  sendText: "todevice_data",
+  sendButton: "todevice_send",
+  statusText: "status"
+};
+
+function timestampString() {
+  var now = new Date();
+  var pad = function(n) {
+    if (n < 10) { return "0" + n; }
+    return n;
+  }
+  return pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds());
+}
 
 function log(level, message) {
   if (level >= debugLevel) { console.log(message); }
+  if (level == kDebugError) {  // Log all errors visibly
+    document.getElementById(ids.statusText).innerHTML =
+      "[" + timestampString() + "] " + message + 
+      "<br/>" + document.getElementById(ids.statusText).innerHTML;
+  }
 }
 
+
 log(kDebugFine, "-- BEGIN --");
-document.getElementById("send_button").addEventListener('click', sendButtonClicked);
+document.getElementById("todevice_send")
+  .addEventListener('click', sendDataToDevice);
+
+document.getElementById(ids.refreshPortsButton)
+  .addEventListener('click', detectPorts);
+
+document.getElementById(ids.connectButton)
+  .addEventListener('click', connectToSelectedSerialPort);
+
+document.getElementById(ids.disconnectButton)
+  .addEventListener('click', disconnect);
+
+document.getElementById(ids.sendText)
+  .addEventListener('keydown', doOnEnter(sendDataToDevice));
+log(kDebugFine, "Listeners attached.");
+
+document.getElementById(ids.disconnectButton).disabled = true;
+document.getElementById(ids.sendButton).disabled = true;
+
+function doOnEnter(targetFunction) {
+  return function(event) {
+    if (event.keyCode == 13) {
+      targetFunction();
+    }
+  }
+}
 
 function detectPorts() {
   var menu = document.getElementById("ports_menu");
@@ -25,36 +77,60 @@ function detectPorts() {
       menu.add(portOpt, null);
     }
   });
+  return false; // Don't submit the form
 }
 
 detectPorts();
 
-function sendButtonClicked() {
+function sendDataToDevice() {
   if (connectionId_ == kUnconnected) {
-    connectToSelectedSerialPort(doSend);
+    log(kDebugError, "ERROR: Not connected");
   } else {
     doSend();
   }
 }
 
-function serialOpenDone(openArg, doneCallback) {
+function serialOpenDone(openArg) {
   log(kDebugFine, "ON OPEN:" + JSON.stringify(openArg));
   if (!openArg || openArg.connectionId == -1) {
-    console.log("ERROR COULD NOT OPEN CONNECTION");
+    log(kDebugError, "Error. Could not open connection.");
     return;
   }
   connectionId_ = openArg.connectionId;
+  document.getElementById(ids.connectButton).disabled = true;
+  document.getElementById(ids.refreshPortsButton).disabled = true;
+  document.getElementById(ids.refreshPortsMenu).disabled = true;
+
+  document.getElementById(ids.disconnectButton).disabled = false;
+  document.getElementById(ids.sendButton).disabled = false;
   log(kDebugNormal, "CONNECTION ID: " + connectionId_);
   scheduleRepeatingRead();
-  doneCallback();
 }
 
-function connectToSelectedSerialPort(doneCallback) {
+function connectToSelectedSerialPort() {
   var portMenu = document.getElementById("ports_menu");
   var selectedPort = portMenu.options[portMenu.selectedIndex].text;
   log(kDebugNormal, "Using port: " + selectedPort);
-  var callbackFn = function(openArg) { serialOpenDone(openArg, doneCallback); };
-  chrome.serial.open(selectedPort, {bitrate: kBitrate}, callbackFn);
+  chrome.serial.open(selectedPort, {bitrate: kBitrate}, serialOpenDone);
+}
+
+function disconnectDone(disconnectArg) {
+  connectionId_ = kUnconnected;
+  document.getElementById(ids.connectButton).disabled = false;
+  document.getElementById(ids.refreshPortsButton).disabled = false;
+  document.getElementById(ids.refreshPortsMenu).disabled = false;
+
+  document.getElementById(ids.disconnectButton).disabled = true;
+  document.getElementById(ids.sendButton).disabled = true;
+  log(kDebugFine, "disconnectArg: " + JSON.stringify(disconnectArg));
+}
+
+function disconnect() {
+  if (connectionId_ == kUnconnected) {
+    log(kDebugNormal, "Can't disconnect: Already disconnected!");
+    return;
+  }
+  chrome.serial.close(connectionId_, disconnectDone);
 }
 
 function doSend() {
@@ -62,7 +138,7 @@ function doSend() {
   var data = input.value;
   input.value = "";
 
-  log(kDebugNormal, "SENDING " + data + " ON CONNECTION: " + connectionId_);
+  log(kDebugFine, "SENDING " + data + " ON CONNECTION: " + connectionId_);
   chrome.serial.write(connectionId_, stringToBinary(data), sendDone);
 }
 
@@ -91,11 +167,11 @@ function binaryToString(buffer) {
 }
 
 function scheduleRepeatingRead() {
-  setTimeout(tryRead, 1000);
+  setTimeout(tryRead, 100);
 }
 
 function tryRead() {
-  chrome.serial.read(connectionId_, 1, readDone);
+  chrome.serial.read(connectionId_, 1024, readDone);
 }
 
 function readDone(readArg) {
