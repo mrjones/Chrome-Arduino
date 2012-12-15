@@ -10,7 +10,11 @@
   },
   "permissions": [
     "experimental",
+    "extension",
     "serial",
     "usb"
+  ],
+  "web_accessible_resources": [
+    "blink-example.hex"
   ]
 }

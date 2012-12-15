@@ -16,7 +16,8 @@ var ids = {
   refreshPortsMenu: "ports_menu",
   sendText: "todevice_data",
   sendButton: "todevice_send",
-  statusText: "status"
+  statusText: "status",
+  uploaderButton: "uploader_button"
 };
 
 function timestampString() {
@@ -53,6 +54,9 @@ document.getElementById(ids.disconnectButton)
 
 document.getElementById(ids.sendText)
   .addEventListener('keydown', doOnEnter(sendDataToDevice));
+
+document.getElementById(ids.uploaderButton)
+  .addEventListener('click', testUploader);
 log(kDebugFine, "Listeners attached.");
 
 document.getElementById(ids.disconnectButton).disabled = true;
