@@ -15,6 +15,8 @@ var STK_GET_SYNC = 0x30;
 var STK_GET_PARAMETER = 0x41;
 
 var STK_HW_VER = 0x80;
+var STK_SW_VER_MAJOR = 0x81;
+var STK_SW_VER_MINOR = 0x82;
 
 ////
 
@@ -61,17 +63,19 @@ function drain(connectionId) {
 // Consume from STK_INSYNC, until STK_OK
 
 var ReadState = {
-  WAITING_FOR_IN_SYNC: 0,
-  CONSUMING_PAYLOAD: 1,
-  DONE: 2,
-  ERROR: 3,
+  READY_FOR_IN_SYNC: 0,
+  READY_FOR_PAYLOAD: 1,
+  READY_FOR_OK: 2,
+  DONE: 3,
+  ERROR: 4,
 };
 
-function consumeMessage(connectionId, callback) {
+function consumeMessage(connectionId, payloadSize, callback) {
   var accum = [];
-  var state = ReadState.WAITING_FOR_IN_SYNC;
+  var state = ReadState.READY_FOR_IN_SYNC;
   var kMaxReads = 100;
   var reads = 0;
+  var payloadBytesConsumed = 0;
 
   var handleRead = function(arg) {
     if (reads++ >= kMaxReads) {
@@ -83,19 +87,32 @@ function consumeMessage(connectionId, callback) {
       console.log("[" + connectionId + "] Read: " + hexData);
     }
     for (var i = 0; i < hexData.length; ++i) {
-      if (state == ReadState.WAITING_FOR_IN_SYNC) {
+      if (state == ReadState.READY_FOR_IN_SYNC) {
         if (hexData[i] == STK_INSYNC) {
-          state = ReadState.CONSUMING_PAYLOAD;
+          if (payloadSize == 0) {
+            state = ReadState.READY_FOR_OK;
+          } else {
+            state = ReadState.READY_FOR_PAYLOAD;
+          }
         } else {
           console.log("Expected STK_INSYNC. Got: " + hexData[i]);
           state = ReadState.ERROR;
         }
-      } else if (state == ReadState.CONSUMING_PAYLOAD) {
+      } else if (state == ReadState.READY_FOR_PAYLOAD) {
+        accum.push(hexData[i]);
+        payloadBytesConsumed++;
+        if (payloadBytesConsumed == payloadSize) {
+          state = ReadState.READY_FOR_OK;
+        } else if (payloadBytesConsumed > payloadSize) {
+          state = ReadState.ERROR;
+          console.log("Read too many payload bytes!");
+        }
+      } else if (state == ReadState.READY_FOR_OK) {
         if (hexData[i] == STK_OK) {
           state = ReadState.DONE;
         } else {
-          accum.push(hexData[i]);
-          // Remains in state CONSUMING_PAYLOAD
+          console.log("Expected STK_OK. Got: " + hexData[i]);
+          state = ReadState.ERROR;
         }
       } else if (state == ReadState.DONE) {
         console.log("Out of sync");
@@ -128,12 +145,12 @@ function consumeMessage(connectionId, callback) {
 //  chrome.serial.read(connectionId, 1024, handleRead);
 }
 
-function writeThenRead(connectionId, outgoingMsg, callback) {
+function writeThenRead(connectionId, outgoingMsg, responsePayloadSize, callback) {
   console.log("[" + connectionId + "] Writing: " + outgoingMsg);
   var outgoingBinary = hexToBin(outgoingMsg);
   // schedule a read in 100ms
   chrome.serial.write(connectionId, outgoingBinary, function(writeArg) {
-      consumeMessage(connectionId, callback);
+      consumeMessage(connectionId, responsePayloadSize, callback);
     });
 }
 
@@ -147,18 +164,28 @@ function uploadOpenDone2(openArg) {
       // Drain the connection
       console.log("DRAINED " + readArg.bytesRead + " BYTES");
 
-      writeThenRead(openArg.connectionId, [STK_GET_SYNC, STK_CRC_EOP], inSyncWithBoard);
+      writeThenRead(openArg.connectionId, [STK_GET_SYNC, STK_CRC_EOP], 0, inSyncWithBoard);
     });
 }
 
 function inSyncWithBoard(connectionId, ok, data) {
   console.log("InSyncWithBoard: " + ok + " / " + data);
 
-  writeThenRead(connectionId, [STK_GET_PARAMETER, STK_HW_VER, STK_CRC_EOP], readHardwareVersion);
+  writeThenRead(connectionId, [STK_GET_PARAMETER, STK_HW_VER, STK_CRC_EOP], 1, readHardwareVersion);
 }
 
 function readHardwareVersion(connectionId, ok, data) {
-  console.log("ReadHardwareVersion: " + ok + " / " + data);
+  console.log("HardwareVersion: " + ok + " / " + data);
+  writeThenRead(connectionId, [STK_GET_PARAMETER, STK_SW_VER_MAJOR, STK_CRC_EOP], 1, readSoftwareMajorVersion);
+}
+
+function readSoftwareMajorVersion(connectionId, ok, data) {
+  console.log("Software major version: " + ok + " / " + data);
+  writeThenRead(connectionId, [STK_GET_PARAMETER, STK_SW_VER_MINOR, STK_CRC_EOP], 1, readSoftwareMinorVersion);
+}
+
+function readSoftwareMinorVersion(connectionId, ok, data) {
+  console.log("Software minor version: " + ok + " / " + data);
 }
 
 function waitForSync(connectionId) {
