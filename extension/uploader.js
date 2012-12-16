@@ -26,22 +26,167 @@ var STK_SW_VER_MINOR = 0x82;
 
 function testUploader() {
   console.log("UPLOADER");
-  parseHexfile('/blink-example.hex');
+  fetchProgram('/blink-example.hex');
 }
 
-function parseHexfile(url) {
+function fetchProgram(url) {
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
-      console.log(xhr.responseText);
-      uploadCompiledSketch(xhr.responseText, "/dev/tty.usbserial-A800eJCe");
+      var programBytes = parseHexFile(xhr.responseText);
+      uploadCompiledSketch(programBytes, "/dev/tty.usbserial-A800eJCe");
     }
   };
   xhr.open("GET", url, true);
   xhr.send();
 }
 
+// http://en.wikipedia.org/wiki/Intel_HEX
+function parseHexFile(data) {
+  var kStartcodeBytes = 1;
+  var kSizeBytes = 2;
+  var kAddressBytes = 4;
+  var kRecordTypeBytes = 2;
+  var kChecksumBytes = 2;
+
+  var dataLines = data.split("\n");
+
+  var dumbOut = "";
+  var out = [];
+
+  var nextAddress = 0;
+
+  for (var i = 0; i < dataLines.length; ++i) {
+    var line = dataLines[i];
+    dumbOut += (line + "\n");
+
+    console.log("considering line: " + line);
+
+    //
+    // Startcode
+    //
+    if (line[0] != ":") {
+      console.log("Bad line [" + i + "]. Missing startcode: " + line);
+      return "FAIL";
+    }
+
+    //
+    // Data Size
+    //
+    var ptr = kStartcodeBytes;
+    if (line.length < kStartcodeBytes + kSizeBytes) {
+      console.log("Bad line [" + i + "]. Missing length bytes: " + line);
+      return "FAIL";
+    }
+    var dataSizeHex = line.substring(ptr, ptr + kSizeBytes);
+    ptr += kSizeBytes;
+    var dataSize = hexToDecimal(dataSizeHex);
+    console.log("Size h:" + dataSizeHex + ", d:" + dataSize);
+
+    //
+    // Address
+    //
+    if (line.length < ptr + kAddressBytes) {
+      console.log("Bad line [" + i + "]. Missing address bytes: " + line);
+      return "FAIL";
+    }
+    var addressHex = line.substring(ptr, ptr + kAddressBytes);
+    ptr += kAddressBytes;
+    var address = hexToDecimal(addressHex);
+    console.log("Address h:" + addressHex + ", d:" + address);
+
+    //
+    // Record Type
+    //
+    if (line.length < ptr + kRecordTypeBytes) {
+      console.log("Bad line [" + i + "]. Missing record type bytes: " + line);
+      return "FAIL";
+    }
+    var recordTypeHex = line.substring(ptr, ptr + kRecordTypeBytes);
+    ptr += kRecordTypeBytes;
+    console.log("RecordType (hex): " + recordTypeHex);
+
+    //
+    // Data
+    //
+    var dataChars = 2 * dataSize;  // Each byte is two chars
+    if (line.length < (ptr + dataChars)) {
+      console.log("Bad line [" + i + "]. Too short for data: " + line);
+      return "FAIL";
+    }
+    var dataHex = line.substring(ptr, ptr + dataChars);
+    ptr += dataChars;
+    console.log("Data (hex): " + dataHex);
+
+    //
+    // Checksum
+    //
+    if (line.length < (ptr + kChecksumBytes)) {
+      console.log("Bad line [" + i + "]. Missing checksum: " + line);
+      return "FAIL";
+    }
+    var checksumHex = line.substring(ptr, ptr + kChecksumBytes);
+    console.log("checksum (hex): " + checksumHex);
+
+    // TODO(mrjones): eliminate or ignore the whitespace at end of lines?
+    if (line.length != ptr + kChecksumBytes + 1) {
+      console.log("Bad line [" + i + "]. leftover bytes: " + line);
+      console.log("Actual len: " + line.length + ", expected: " + (ptr + kChecksumBytes));
+      return "FAIL";
+    }
+
+    var kDataRecord = "00";
+    var kEndOfFileRecord = "01";
+
+    if (recordTypeHex == kEndOfFileRecord) {
+//      return dumbOut;
+      return out;
+    } else if (recordTypeHex == kDataRecord) {
+      if (address != nextAddress) {
+        console.log("I need contiguous addresses");
+        return "FAIL";
+      }
+      nextAddress = address + dataSize;
+
+      var bytes = hexCharsToByteArray(dataHex);
+      if (bytes == -1) {
+        console.log("Couldn't parse hex data: " + dataHex);
+        return "FAIL";
+      }
+      out.push(bytes);
+    } else {
+      console.log("I can't handle records of type: " + recordTypeHex);
+      return "FAIL";
+    }
+  }
+
+  console.log("Never found EOF!");
+  return "FAIL";
+}
+
+function hexToDecimal(h) {
+  return parseInt(h, 16);
+}
+
+function hexCharsToByteArray(hc) {
+  if (hc.length % 2 != 0) {
+    console.log("Need 2-char hex bytes");
+    return -1; // :(
+  }
+
+  var bytes = [];
+  for (var i = 0; i < hc.length / 2; ++i) {
+    var hexChars = hc.substring(i * 2, (i * 2) + 2);
+    var byte = hexToDecimal(hexChars);
+    bytes.push(byte);
+  }
+  return bytes;
+}
+
+var sketchData_;
+
 function uploadCompiledSketch(hexData, serialPortName) {
+  sketchData_ = hexData;
   console.log("Uploading to: " + serialPortName);
   chrome.serial.open(serialPortName, { bitrate: 57600 }, uploadOpenDone2);
 }
@@ -199,6 +344,7 @@ function enteredProgmode(connectionId, ok, data) {
 
 function readSignature(connectionId, ok, data) {
   console.log("Device signature: " + ok + " / " + data);
+  console.log("Now I should upload: " + sketchData_);
   writeThenRead(connectionId, [STK_LEAVE_PROGMODE, STK_CRC_EOP], 0, leftProgmode);
 }
 
