@@ -15,6 +15,8 @@ var STK_GET_SYNC = 0x30;
 var STK_GET_PARAMETER = 0x41;
 var STK_ENTER_PROGMODE = 0x50;
 var STK_LEAVE_PROGMODE = 0x51;
+var STK_LOAD_ADDRESS = 0x55;
+var STK_PROG_PAGE = 0x64;
 var STK_READ_SIGN = 0x75;
 
 var STK_HW_VER = 0x80;
@@ -153,7 +155,8 @@ function parseHexFile(data) {
         console.log("Couldn't parse hex data: " + dataHex);
         return "FAIL";
       }
-      out.push(bytes);
+      out = out.concat(bytes);
+      console.log("out is now length: " + out.length);
     } else {
       console.log("I can't handle records of type: " + recordTypeHex);
       return "FAIL";
@@ -184,10 +187,12 @@ function hexCharsToByteArray(hc) {
 }
 
 var sketchData_;
+var inSync_ = false;
 
 function uploadCompiledSketch(hexData, serialPortName) {
   sketchData_ = hexData;
   console.log("Uploading to: " + serialPortName);
+  inSync_ = false;
   chrome.serial.open(serialPortName, { bitrate: 57600 }, uploadOpenDone2);
 }
 
@@ -217,6 +222,7 @@ var ReadState = {
   DONE: 3,
   ERROR: 4,
 };
+
 
 function consumeMessage(connectionId, payloadSize, callback) {
   var accum = [];
@@ -280,15 +286,21 @@ function consumeMessage(connectionId, payloadSize, callback) {
     } else {
       console.log("Paused in state: " + state + ". Reading again.");
 
-      // Mega hack (temporary)
-      chrome.serial.write(connectionId, hexToBin([STK_GET_SYNC, STK_CRC_EOP]), function() { });
+      if (!inSync_) {
+        // Mega hack (temporary)
+        chrome.serial.write(connectionId, hexToBin([STK_GET_SYNC, STK_CRC_EOP]), function() {
+            // Don't tight-loop waiting for the message.
+            setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
+          });
+      } else {
+        // Don't tight-loop waiting for the message.
+        setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
+      }
 
-      // Don't tight-loop waiting for the message.
-      setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
     }
   };
 
-  console.log("Scheduling a read in 1s");
+  console.log("Scheduling a read in .1s");
   setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
 //  chrome.serial.read(connectionId, 1024, handleRead);
 }
@@ -318,7 +330,7 @@ function uploadOpenDone2(openArg) {
 
 function inSyncWithBoard(connectionId, ok, data) {
   console.log("InSyncWithBoard: " + ok + " / " + data);
-
+  inSync_ = true;
   writeThenRead(connectionId, [STK_GET_PARAMETER, STK_HW_VER, STK_CRC_EOP], 1, readHardwareVersion);
 }
 
@@ -344,14 +356,68 @@ function enteredProgmode(connectionId, ok, data) {
 
 function readSignature(connectionId, ok, data) {
   console.log("Device signature: " + ok + " / " + data);
-  console.log("Now I should upload: " + sketchData_);
-  writeThenRead(connectionId, [STK_LEAVE_PROGMODE, STK_CRC_EOP], 0, leftProgmode);
+
+  programFlash(connectionId, sketchData_, 0, 128, doneProgramming);
+}
+
+function doneProgramming(connectionId) { 
+  writeThenRead(connectionId, [STK_LEAVE_PROGMODE, STK_CRC_EOP], 0, leftProgmode); 
 }
 
 function leftProgmode(connectionId, ok, data) {
   console.log("Left progmode: " + ok + " / " + data);
 }
 
+function programFlash(connectionId, data, offset, length, doneCallback) {
+  console.log("program flash: data.length: " + data.length + ", offset: " + offset + ", length: " + length);
+  var payload;
+
+  if (offset >= data.length) {
+    console.log("Done programming flash: " + offset + " vs. " + data.length);
+    doneCallback(connectionId);
+    return;
+  }
+
+  if (offset + length > data.length) {
+    console.log("Grabbing " + length + " bytes would go past the end.");
+    console.log("Grabbing bytes " + offset + " to " + data.length + " bytes would go past the end.");
+    payload = data.slice(offset, data.length);
+    var padSize = length - payload.length;
+    console.log("Padding " + padSize + " 0 byte at the end");
+    for (var i = 0; i < padSize; ++i) {
+      payload.push(0);
+    }
+  } else {
+    console.log("Grabbing bytes: " + offset + " until " + (offset + length));
+    payload = data.slice(offset, offset + length);
+  }
+
+  var addressBytes = storeAsTwoBytes(offset);
+  var sizeBytes = storeAsTwoBytes(length);
+  var kFlashMemoryType = 0x46;
+
+  var loadAddressMessage = [STK_LOAD_ADDRESS, addressBytes[0], addressBytes[1], STK_CRC_EOP];
+  var programMessage = [STK_PROG_PAGE, sizeBytes[0], sizeBytes[1], kFlashMemoryType];
+  programMessage = programMessage.concat(payload);
+  programMessage.push(STK_CRC_EOP);
+
+  console.log("LOADING ADDRESS: " + offset + " as [" + addressBytes[0] + ", " + addressBytes[1] + "]");
+  writeThenRead(connectionId, loadAddressMessage, 0, function(connectionId, ok, reponse) {
+      if (!ok) { console.log("Error programming the flash (load address)"); return; }
+      writeThenRead(connectionId, programMessage, 0, function(connectionId, ok, response) {
+          if (!ok) { console.log("Error programming the flash (send data)"); return }
+          // Program the next section
+          programFlash(connectionId, data, offset + length, length, doneCallback);
+        });
+    });
+}
+
+function storeAsTwoBytes(n) {
+  var lo = (n & 0x00FF);
+  var hi = (n & 0xFF00) >> 8;
+  console.log("storeTwoBytes(" + n + ") --> [" + hi + "," + lo + "]");
+  return [hi, lo];
+}
 
 function waitForSync(connectionId) {
   console.log("readying sync bit from: " + connectionId);
