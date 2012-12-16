@@ -13,6 +13,9 @@ var STK_CRC_EOP = 0x20;
 
 var STK_GET_SYNC = 0x30;
 var STK_GET_PARAMETER = 0x41;
+var STK_ENTER_PROGMODE = 0x50;
+var STK_LEAVE_PROGMODE = 0x51;
+var STK_READ_SIGN = 0x75;
 
 var STK_HW_VER = 0x80;
 var STK_SW_VER_MAJOR = 0x81;
@@ -141,7 +144,7 @@ function consumeMessage(connectionId, payloadSize, callback) {
   };
 
   console.log("Scheduling a read in 1s");
-  setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 1000);
+  setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
 //  chrome.serial.read(connectionId, 1024, handleRead);
 }
 
@@ -186,7 +189,23 @@ function readSoftwareMajorVersion(connectionId, ok, data) {
 
 function readSoftwareMinorVersion(connectionId, ok, data) {
   console.log("Software minor version: " + ok + " / " + data);
+  writeThenRead(connectionId, [STK_ENTER_PROGMODE, STK_CRC_EOP], 0, enteredProgmode);
 }
+
+function enteredProgmode(connectionId, ok, data) {
+  console.log("Entered progmode: " + ok + " / " + data);
+  writeThenRead(connectionId, [STK_READ_SIGN, STK_CRC_EOP], 3, readSignature);  
+}
+
+function readSignature(connectionId, ok, data) {
+  console.log("Device signature: " + ok + " / " + data);
+  writeThenRead(connectionId, [STK_LEAVE_PROGMODE, STK_CRC_EOP], 0, leftProgmode);
+}
+
+function leftProgmode(connectionId, ok, data) {
+  console.log("Left progmode: " + ok + " / " + data);
+}
+
 
 function waitForSync(connectionId) {
   console.log("readying sync bit from: " + connectionId);
