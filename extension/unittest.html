@@ -1,0 +1,39 @@
+<html>
+  <head>
+    <title>CEX Unit Tests</title>
+  </head>
+  <body>
+    <div id="results"></div>
+    <script>
+      function RunTest(testCase) {
+        var testCaseName = testCase.Name;
+
+        var parentResultsDiv = document.getElementById('results');
+        var testResultsDiv = document.createElement('div');
+        var testNameDiv = document.createElement('div');
+        var testMessageDiv = document.createElement('div');
+
+        testResultsDiv.appendChild(testNameDiv);
+        testResultsDiv.appendChild(testMessageDiv);
+        parentResultsDiv.appendChild(testResultsDiv);
+  
+        testNameDiv.innerText = testCaseName + " - RUNNING";
+        testResultsDiv.style.border = "1px solid black";
+
+        var result = testCase.Run();
+        if (result.passed) {
+          testNameDiv.style.color = 'green';
+          testNameDiv.innerText = testCaseName + " - PASSED";
+        } else {
+          testNameDiv.style.color = 'red';
+          testNameDiv.innerText = testCaseName + " - FAILED";
+        }
+        for (var i = 0; i < result.messages.length; ++i) { 
+          testMessageDiv.innerText += result.messages[i];
+        }
+      }
+    </script>
+    <script src="uploader.js"></script>
+    <script src="uploader_test.js"></script>
+  </body>
+</html>
