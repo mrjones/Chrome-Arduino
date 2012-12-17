@@ -1,8 +1,10 @@
 var UploaderTest = {
-  Name: "UploaderTest",
-  Run: function() {
-    return {passed: false, messages: ['Foo: 1 != 2']};
+  pass: function() {
+    return {passed: true, message: null};
+  },
+  fail: function() {
+    return {passed: false, message: "hard-coded to fail"};
   }
 };
 
-RunTest(UploaderTest);
+RunTest("UploaderTest", UploaderTest);
