@@ -18,6 +18,8 @@ function RunTest(testCaseName, testCase) {
     testNameDiv.innerText = testCaseName + " - FAILED";
   }
   for (var i = 0; i < result.messages.length; ++i) { 
+    var messageDiv = document.createElement('div');
+    testMessageDiv.appendChild(messageDiv);
     testMessageDiv.innerText += result.messages[i];
   }
 }
