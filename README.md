@@ -9,4 +9,3 @@ Unit Tests
 ==========
 
 Open extension/unittest.html in a browser
-
