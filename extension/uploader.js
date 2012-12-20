@@ -35,7 +35,7 @@ function fetchProgram(url) {
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
-      var programBytes = parseHexFile(xhr.responseText);
+      var programBytes = ParseHexFile(xhr.responseText);
       uploadCompiledSketch(programBytes, "/dev/tty.usbserial-A800eJCe");
     }
   };

@@ -27,27 +27,60 @@ var Test = {
     }
   },
 
-  ArrayEquals: function(a1, a2) {
-    if (a1.length != a2.length) {
-      return false;
+
+  AssertArrayEquals: function(expected, actual) {
+    if (expected.length != actual.length) {
+        throw("Lengths do not match.\n" +
+              "Expected: " + expected + "\n" +
+              "Actual:   " + actual);
     }
 
-    for (var i = 0; i < a1.length; ++i) {
-      if (a1[i] != a2[i]) {
-        return false;
+    for (var i = 0; i < expected.length; ++i) {
+      if (expected[i] != actual[i]) {
+        throw("Mismatch at position " + i + ".\n" +
+              "Expected: " + expected + "\n" +
+              "Actual:   " + actual);
       }
     }
 
     return true;
+  },
+
+  Fail: function(message) {
+    throw(message);
   }
 }
 
+var catchExceptions = false;
+
 function execute(testCase) {
   var overallResult = {passed: true, messages: []};
+  var testsRun = 0;
   for (testName in testCase) {
-    var result = testCase[testName]();
-    if (!result.passed) { overallResult.passed = false; }
-    if (result.message != null) { overallResult.messages.push(result.message); }
+    if (testName.toString() != "helpers") {
+      var exception = false;
+      testsRun++;
+      if (catchExceptions) {
+        try {
+            var result = testCase[testName]();
+        } catch (e) {
+          console.log(e);
+          for (p in e) {
+              console.log(p + " -> " + e[p]);
+          }
+          overallResult.passed = false;
+          overallResult.messages.push(e);
+        }
+      } else {
+        testCase[testName]();
+      }
+    } else {
+      console.log("Skipping '" + testName + "' since it doesn't look like a test.");
+    }
+  }
+
+  if (testsRun == 0) {
+    return { passed: false, messages: [ "No tests were run" ] };
   }
   return overallResult;
 }
