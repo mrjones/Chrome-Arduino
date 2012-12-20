@@ -51,7 +51,7 @@ var Test = {
   }
 }
 
-var catchExceptions = false;
+var catchExceptions = true;
 
 function execute(testCase) {
   var overallResult = {passed: true, messages: []};
@@ -60,16 +60,14 @@ function execute(testCase) {
     if (testName.toString() != "helpers") {
       var exception = false;
       testsRun++;
+      console.log(" --- Running: " + testName + " --- ");
       if (catchExceptions) {
         try {
             var result = testCase[testName]();
         } catch (e) {
           console.log(e);
-          for (p in e) {
-              console.log(p + " -> " + e[p]);
-          }
           overallResult.passed = false;
-          overallResult.messages.push(e);
+          overallResult.messages.push(testName + ": " + e);
         }
       } else {
         testCase[testName]();
