@@ -7,6 +7,10 @@
 //
 // returns: an array of integers (necessarily in the range [0,255]) where the n-th
 //   array entry represents the byte at address 'n'.
+//
+// TODOs:
+// - Validate checksum
+// - Handle other record types
 function ParseHexFile(input) {
   var kStartcodeBytes = 1;
   var kSizeBytes = 2;
