@@ -8,4 +8,8 @@ Directory Structure:
 Unit Tests
 ==========
 
-Open extension/unittest.html in a browser
+Either:
+- Open extension/unittest.html in a browser
+- Or, Use [PhantomJS](http://phantomjs.org):
+
+    path/to/phantomjs extension/phantom.js 
