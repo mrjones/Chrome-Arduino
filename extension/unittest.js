@@ -1,4 +1,5 @@
 var Test = {
+  StructuredResults: [],
   Run: function(testCaseName, testCase) {
     var parentResultsDiv = document.getElementById('results');
     var testResultsDiv = document.createElement('div');
@@ -11,6 +12,8 @@ var Test = {
     testResultsDiv.style.border = "1px solid black";
 
     var result = execute(testCase);
+    result.testCaseName = testCaseName;
+    this.StructuredResults.push(result);
     if (result.passed) {
         testNameDiv.style.color = 'green';
         testNameDiv.innerText = testCaseName + " - PASSED";
@@ -26,7 +29,6 @@ var Test = {
         messagePre.innerText += result.messages[i];
     }
   },
-
 
   AssertArrayEquals: function(expected, actual) {
     if (expected.length != actual.length) {
