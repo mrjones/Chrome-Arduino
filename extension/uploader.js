@@ -50,23 +50,37 @@ function uploadCompiledSketch(hexData, serialPortName) {
   sketchData_ = hexData;
   console.log("Uploading to: " + serialPortName);
   inSync_ = false;
-  chrome.serial.open(serialPortName, { bitrate: 57600 }, uploadOpenDone2);
+  chrome.serial.open(serialPortName, { bitrate: 57600 }, uploadOpenDone);
 }
 
-////////////
+//
+// Internal/implementation
+// TODO(mrjones): move into an object/namespace.
+//
 
-// Consume from STK_INSYNC, until STK_OK
-
-var ReadState = {
-  READY_FOR_IN_SYNC: 0,
-  READY_FOR_PAYLOAD: 1,
-  READY_FOR_OK: 2,
-  DONE: 3,
-  ERROR: 4,
-};
-
-
+// Reads a pre-specified number of bytes on the serial port.
+//
+// The message format expected is:
+// STK_INSYNC, <specified number of bytes>, STK_OK
+//
+// Params:
+// - connectionId: the serial connection ID to attempt to read from
+// - payloadSize: the number of bytes to read between INSYNC and OK
+// - callback: will be called after a read with three arguments:
+//   1. int connectionId: the connection that the read was attempted on
+//      (this will be the same as the connectionId input param).
+//   2. boolean success: true iff a well-formed message was read
+//   3. int[] accum: if success is 'true' the payload data read (not
+//      including STK_INSYNC or STK_OK.
 function consumeMessage(connectionId, payloadSize, callback) {
+  var ReadState = {
+    READY_FOR_IN_SYNC: 0,
+    READY_FOR_PAYLOAD: 1,
+    READY_FOR_OK: 2,
+    DONE: 3,
+    ERROR: 4,
+  };
+
   var accum = [];
   var state = ReadState.READY_FOR_IN_SYNC;
   var kMaxReads = 100;
@@ -147,6 +161,19 @@ function consumeMessage(connectionId, payloadSize, callback) {
 //  chrome.serial.read(connectionId, 1024, handleRead);
 }
 
+// Write a message, and then wait for a reply on a given serial port.
+//
+// Params:
+// - int connectionId: the ID of the serial connection to read and write on
+// - int[] outgoingMsg: the data to write on the serial connection. Each entry
+//   represents one byte, so ints must be in the range [0-255]. This currently
+//   does not append an STK_CRC_EOP at the end of a message, so callers must
+//   be sure to include it.
+// - int responsePayloadSize: The number of bytes expected in the response
+//   message, not including STK_INSYNC or STK_OK (see 'consumeMessage()').
+// - callback: See 'callback' in 'consumeMessage()'.
+//   
+// TODO(mrjones): consider setting STK_CRC_EOP automatically?
 function writeThenRead(connectionId, outgoingMsg, responsePayloadSize, callback) {
   console.log("[" + connectionId + "] Writing: " + outgoingMsg);
   var outgoingBinary = hexToBin(outgoingMsg);
@@ -156,7 +183,7 @@ function writeThenRead(connectionId, outgoingMsg, responsePayloadSize, callback)
     });
 }
 
-function uploadOpenDone2(openArg) {
+function uploadOpenDone(openArg) {
   if (openArg.connectionId == -1) {
     console.log("Couldn't connect to board");
     return;
@@ -238,12 +265,13 @@ function programFlash(connectionId, data, offset, length, doneCallback) {
   var sizeBytes = storeAsTwoBytes(length);
   var kFlashMemoryType = 0x46;
 
-  var loadAddressMessage = [STK_LOAD_ADDRESS, addressBytes[0], addressBytes[1], STK_CRC_EOP];
-  var programMessage = [STK_PROG_PAGE, sizeBytes[0], sizeBytes[1], kFlashMemoryType];
+  var loadAddressMessage = [
+    STK_LOAD_ADDRESS, addressBytes[0], addressBytes[1], STK_CRC_EOP];
+  var programMessage = [
+    STK_PROG_PAGE, sizeBytes[0], sizeBytes[1], kFlashMemoryType];
   programMessage = programMessage.concat(payload);
   programMessage.push(STK_CRC_EOP);
 
-  console.log("LOADING ADDRESS: " + offset + " as [" + addressBytes[0] + ", " + addressBytes[1] + "]");
   writeThenRead(connectionId, loadAddressMessage, 0, function(connectionId, ok, reponse) {
       if (!ok) { console.log("Error programming the flash (load address)"); return; }
       writeThenRead(connectionId, programMessage, 0, function(connectionId, ok, response) {
