@@ -14,7 +14,7 @@ page.open(url, function (status) {
       return;
     }
     var results = page.evaluate( function() {
-        return Test.StructuredResults;
+      return Test.StructuredResults;
     });
     var testCount = 0;
     var failCount = 0;

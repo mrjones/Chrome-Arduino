@@ -65,9 +65,9 @@ function execute(testCase) {
       console.log(" --- Running: " + testName + " --- ");
       if (catchExceptions) {
         try {
-            var result = testCase[testName]();
+          var result = testCase[testName]();
         } catch (e) {
-          console.log(e);
+          console.log("Caught: " + e);
           overallResult.passed = false;
           overallResult.messages.push(testName + ": " + e);
         }
