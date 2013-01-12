@@ -161,6 +161,17 @@ function consumeMessage(connectionId, payloadSize, callback) {
 //  chrome.serial.read(connectionId, 1024, handleRead);
 }
 
+function hexRep(intArray) {
+  var buf = "[";
+  var sep = "";
+  for (var i = 0; i < intArray.length; ++i) {
+    buf += (sep + intArray[i].toString(16));
+    sep = ",";
+  }
+  buf += "]";
+  return buf;
+}
+
 // Write a message, and then wait for a reply on a given serial port.
 //
 // Params:
@@ -175,7 +186,7 @@ function consumeMessage(connectionId, payloadSize, callback) {
 //   
 // TODO(mrjones): consider setting STK_CRC_EOP automatically?
 function writeThenRead(connectionId, outgoingMsg, responsePayloadSize, callback) {
-  console.log("[" + connectionId + "] Writing: " + outgoingMsg);
+  console.log("[" + connectionId + "] Writing: " + hexRep(outgoingMsg));
   var outgoingBinary = hexToBin(outgoingMsg);
   // schedule a read in 100ms
   chrome.serial.write(connectionId, outgoingBinary, function(writeArg) {
@@ -261,12 +272,12 @@ function programFlash(connectionId, data, offset, length, doneCallback) {
     payload = data.slice(offset, offset + length);
   }
 
-  var addressBytes = storeAsTwoBytes(offset);
+  var addressBytes = storeAsTwoBytes(offset / 2); // Word address, verify this
   var sizeBytes = storeAsTwoBytes(length);
   var kFlashMemoryType = 0x46;
 
   var loadAddressMessage = [
-    STK_LOAD_ADDRESS, addressBytes[0], addressBytes[1], STK_CRC_EOP];
+    STK_LOAD_ADDRESS, addressBytes[1], addressBytes[0], STK_CRC_EOP];
   var programMessage = [
     STK_PROG_PAGE, sizeBytes[0], sizeBytes[1], kFlashMemoryType];
   programMessage = programMessage.concat(payload);
