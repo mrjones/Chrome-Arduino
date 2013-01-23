@@ -1,8 +1,3 @@
-var kDebugError = 0;
-var kDebugNormal = 1;
-var kDebugFine = 2;
-var debugLevel = kDebugNormal;
-
 var kBitrate = 9600; // TODO(mrjones): make a UI option
 var kUnconnected = -1;
 
@@ -29,16 +24,6 @@ function timestampString() {
   return pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds());
 }
 
-function log(level, message) {
-  if (level >= debugLevel) { console.log(message); }
-  if (level == kDebugError) {  // Log all errors visibly
-    document.getElementById(ids.statusText).innerHTML =
-      "[" + timestampString() + "] " + message + 
-      "<br/>" + document.getElementById(ids.statusText).innerHTML;
-  }
-}
-
-
 log(kDebugFine, "-- BEGIN --");
 document.getElementById("todevice_send")
   .addEventListener('click', sendDataToDevice);
@@ -61,6 +46,12 @@ log(kDebugFine, "Listeners attached.");
 
 document.getElementById(ids.disconnectButton).disabled = true;
 document.getElementById(ids.sendButton).disabled = true;
+
+function testUploader() {
+  var portMenu = document.getElementById("ports_menu");
+  var selectedPort = portMenu.options[portMenu.selectedIndex].text;
+  uploadBlinkSketch(selectedPort);
+}
 
 function doOnEnter(targetFunction) {
   return function(event) {

@@ -26,17 +26,20 @@ var STK_SW_VER_MINOR = 0x82;
 ////
 
 
-function testUploader() {
-  console.log("UPLOADER");
-  fetchProgram('/blink-example.hex');
+function uploadBlinkSketch(serialPort) {
+  log(kDebugFine, "uploading blink sketch");
+  fetchProgram('/blink-example.hex', function(programBytes) { 
+      log(kDebugFine, "Fetched program. Uploading to: " + serialPort);
+      uploadCompiledSketch(programBytes, serialPort);
+    });
 }
 
-function fetchProgram(url) {
+function fetchProgram(url, handler) {
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
       var programBytes = ParseHexFile(xhr.responseText);
-      uploadCompiledSketch(programBytes, "/dev/tty.usbserial-A800eJCe");
+      handler(programBytes);
     }
   };
   xhr.open("GET", url, true);
@@ -48,7 +51,6 @@ var inSync_ = false;
 
 function uploadCompiledSketch(hexData, serialPortName) {
   sketchData_ = hexData;
-  console.log("Uploading to: " + serialPortName);
   inSync_ = false;
   chrome.serial.open(serialPortName, { bitrate: 57600 }, uploadOpenDone);
 }
@@ -89,12 +91,14 @@ function consumeMessage(connectionId, payloadSize, callback) {
 
   var handleRead = function(arg) {
     if (reads++ >= kMaxReads) {
-      console.log("Too many reads. Bailing.");
+      log(kDebugError, "Too many reads. Bailing.");
       return;
     }
     var hexData = binToHex(arg.data);
     if (arg.bytesRead > 0) {
-      console.log("[" + connectionId + "] Read: " + hexData);
+      log(kDebugFine, "[" + connectionId + "] Read: " + hexData);
+    } else {
+      log(kDebugFine, "No data read.");
     }
     for (var i = 0; i < hexData.length; ++i) {
       if (state == ReadState.READY_FOR_IN_SYNC) {
@@ -105,8 +109,8 @@ function consumeMessage(connectionId, payloadSize, callback) {
             state = ReadState.READY_FOR_PAYLOAD;
           }
         } else {
-          console.log("Expected STK_INSYNC. Got: " + hexData[i]);
-          state = ReadState.ERROR;
+          log(kDebugError, "Expected STK_INSYNC. Got: " + hexData[i] + ". Ignoring.");
+//          state = ReadState.ERROR;
         }
       } else if (state == ReadState.READY_FOR_PAYLOAD) {
         accum.push(hexData[i]);
@@ -115,48 +119,49 @@ function consumeMessage(connectionId, payloadSize, callback) {
           state = ReadState.READY_FOR_OK;
         } else if (payloadBytesConsumed > payloadSize) {
           state = ReadState.ERROR;
-          console.log("Read too many payload bytes!");
+          log(kDebugError, "Read too many payload bytes!");
         }
       } else if (state == ReadState.READY_FOR_OK) {
         if (hexData[i] == STK_OK) {
           state = ReadState.DONE;
         } else {
-          console.log("Expected STK_OK. Got: " + hexData[i]);
+          log(kDebugError, "Expected STK_OK. Got: " + hexData[i]);
           state = ReadState.ERROR;
         }
       } else if (state == ReadState.DONE) {
-        console.log("Out of sync");
+        log(kDebugError, "Out of sync");
         state = ReadState.ERROR;
       } else if (state == ReadState.ERROR) {
-        console.log("In error state. Draining byte: " + hexData[i]);
+        log(kDebugError, "In error state. Draining byte: " + hexData[i]);
         // Remains in state ERROR
       } else {
-        console.log("Unknown state: " + state);
+        log(kDebugError, "Unknown state: " + state);
         state = ReadState.ERROR;
       }
     }
 
     if (state == ReadState.ERROR || state == ReadState.DONE) {
-      console.log("Finished in state: " + state);
+      log(kDebugFine, "Finished in state: " + state);
       callback(connectionId, state == ReadState.DONE, accum);
     } else {
-      console.log("Paused in state: " + state + ". Reading again.");
+      log(kDebugFine, "Paused in state: " + state + ". Reading again.");
 
-      if (!inSync_) {
+//      if (!inSync_ && (reads % 10) == 0) {
         // Mega hack (temporary)
+        log(kDebugFine, "Mega Hack: Writing: " + hexRep([STK_GET_SYNC, STK_CRC_EOP]));
         chrome.serial.write(connectionId, hexToBin([STK_GET_SYNC, STK_CRC_EOP]), function() {
             // Don't tight-loop waiting for the message.
             setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
           });
-      } else {
-        // Don't tight-loop waiting for the message.
-        setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
-      }
+//      } else {
+//        // Don't tight-loop waiting for the message.
+//        setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
+//      }
 
     }
   };
 
-  console.log("Scheduling a read in .1s");
+  log(kDebugFine, "Scheduling a read in .1s");
   setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
 //  chrome.serial.read(connectionId, 1024, handleRead);
 }
@@ -186,7 +191,7 @@ function hexRep(intArray) {
 //   
 // TODO(mrjones): consider setting STK_CRC_EOP automatically?
 function writeThenRead(connectionId, outgoingMsg, responsePayloadSize, callback) {
-  console.log("[" + connectionId + "] Writing: " + hexRep(outgoingMsg));
+  log(kDebugNormal, "[" + connectionId + "] Writing: " + hexRep(outgoingMsg));
   var outgoingBinary = hexToBin(outgoingMsg);
   // schedule a read in 100ms
   chrome.serial.write(connectionId, outgoingBinary, function(writeArg) {
@@ -196,46 +201,49 @@ function writeThenRead(connectionId, outgoingMsg, responsePayloadSize, callback)
 
 function uploadOpenDone(openArg) {
   if (openArg.connectionId == -1) {
-    console.log("Couldn't connect to board");
+    log(kDebugError, "Couldn't connect to board");
     return;
   }
 
   chrome.serial.read(openArg.connectionId, 1024, function(readArg) {
       // Drain the connection
-      console.log("DRAINED " + readArg.bytesRead + " BYTES");
+      log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
 
       writeThenRead(openArg.connectionId, [STK_GET_SYNC, STK_CRC_EOP], 0, inSyncWithBoard);
     });
 }
 
 function inSyncWithBoard(connectionId, ok, data) {
-  console.log("InSyncWithBoard: " + ok + " / " + data);
+  if (!ok) {
+    log(kDebugError, "InSyncWithBoard: NOT OK");
+  }
+  log(kDebugNormal, "InSyncWithBoard: " + ok + " / " + data);
   inSync_ = true;
   writeThenRead(connectionId, [STK_GET_PARAMETER, STK_HW_VER, STK_CRC_EOP], 1, readHardwareVersion);
 }
 
 function readHardwareVersion(connectionId, ok, data) {
-  console.log("HardwareVersion: " + ok + " / " + data);
+  log(kDebugFine, "HardwareVersion: " + ok + " / " + data);
   writeThenRead(connectionId, [STK_GET_PARAMETER, STK_SW_VER_MAJOR, STK_CRC_EOP], 1, readSoftwareMajorVersion);
 }
 
 function readSoftwareMajorVersion(connectionId, ok, data) {
-  console.log("Software major version: " + ok + " / " + data);
+  log(kDebugFine, "Software major version: " + ok + " / " + data);
   writeThenRead(connectionId, [STK_GET_PARAMETER, STK_SW_VER_MINOR, STK_CRC_EOP], 1, readSoftwareMinorVersion);
 }
 
 function readSoftwareMinorVersion(connectionId, ok, data) {
-  console.log("Software minor version: " + ok + " / " + data);
+  log(kDebugFine, "Software minor version: " + ok + " / " + data);
   writeThenRead(connectionId, [STK_ENTER_PROGMODE, STK_CRC_EOP], 0, enteredProgmode);
 }
 
 function enteredProgmode(connectionId, ok, data) {
-  console.log("Entered progmode: " + ok + " / " + data);
+  log(kDebugNormal, "Entered progmode: " + ok + " / " + data);
   writeThenRead(connectionId, [STK_READ_SIGN, STK_CRC_EOP], 3, readSignature);  
 }
 
 function readSignature(connectionId, ok, data) {
-  console.log("Device signature: " + ok + " / " + data);
+  log(kDebugFine, "Device signature: " + ok + " / " + data);
 
   programFlash(connectionId, sketchData_, 0, 128, doneProgramming);
 }
@@ -245,30 +253,30 @@ function doneProgramming(connectionId) {
 }
 
 function leftProgmode(connectionId, ok, data) {
-  console.log("Left progmode: " + ok + " / " + data);
+  log(kDebugNormal, "Left progmode: " + ok + " / " + data);
 }
 
 function programFlash(connectionId, data, offset, length, doneCallback) {
-  console.log("program flash: data.length: " + data.length + ", offset: " + offset + ", length: " + length);
+  log(kDebugFine, "program flash: data.length: " + data.length + ", offset: " + offset + ", length: " + length);
   var payload;
 
   if (offset >= data.length) {
-    console.log("Done programming flash: " + offset + " vs. " + data.length);
+    log(kDebugNormal, "Done programming flash: " + offset + " vs. " + data.length);
     doneCallback(connectionId);
     return;
   }
 
   if (offset + length > data.length) {
-    console.log("Grabbing " + length + " bytes would go past the end.");
-    console.log("Grabbing bytes " + offset + " to " + data.length + " bytes would go past the end.");
+    log(kDebugFine, "Grabbing " + length + " bytes would go past the end.");
+    log(kDebugFine, "Grabbing bytes " + offset + " to " + data.length + " bytes would go past the end.");
     payload = data.slice(offset, data.length);
     var padSize = length - payload.length;
-    console.log("Padding " + padSize + " 0 byte at the end");
+    log(kDebugFine, "Padding " + padSize + " 0 byte at the end");
     for (var i = 0; i < padSize; ++i) {
       payload.push(0);
     }
   } else {
-    console.log("Grabbing bytes: " + offset + " until " + (offset + length));
+    log(kDebugFine, "Grabbing bytes: " + offset + " until " + (offset + length));
     payload = data.slice(offset, offset + length);
   }
 
@@ -284,9 +292,9 @@ function programFlash(connectionId, data, offset, length, doneCallback) {
   programMessage.push(STK_CRC_EOP);
 
   writeThenRead(connectionId, loadAddressMessage, 0, function(connectionId, ok, reponse) {
-      if (!ok) { console.log("Error programming the flash (load address)"); return; }
+      if (!ok) { log(kDebugError, "Error programming the flash (load address)"); return; }
       writeThenRead(connectionId, programMessage, 0, function(connectionId, ok, response) {
-          if (!ok) { console.log("Error programming the flash (send data)"); return }
+          if (!ok) { log(kDebugError, "Error programming the flash (send data)"); return }
           // Program the next section
           programFlash(connectionId, data, offset + length, length, doneCallback);
         });
@@ -296,15 +304,15 @@ function programFlash(connectionId, data, offset, length, doneCallback) {
 function storeAsTwoBytes(n) {
   var lo = (n & 0x00FF);
   var hi = (n & 0xFF00) >> 8;
-  console.log("storeTwoBytes(" + n + ") --> [" + hi + "," + lo + "]");
+  log(kDebugFine, "storeTwoBytes(" + n + ") --> [" + hi + "," + lo + "]");
   return [hi, lo];
 }
 
 function waitForSync(connectionId) {
-  console.log("readying sync bit from: " + connectionId);
+  log(kDebugFine, "readying sync bit from: " + connectionId);
   var hex = [STK_GET_SYNC, STK_CRC_EOP];
-  var data = hexToBin(hex)
-  console.log("writing: " + hex + " -> " + data);
+  var data = hexToBin(hex);
+  log(kDebugFine, "writing: " + hex + " -> " + data);
   chrome.serial.write(connectionId, data, function(arg) { checkSync(connectionId, arg) } );
 }
 
