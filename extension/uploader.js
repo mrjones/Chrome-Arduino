@@ -85,7 +85,7 @@ function consumeMessage(connectionId, payloadSize, callback) {
 
   var accum = [];
   var state = ReadState.READY_FOR_IN_SYNC;
-  var kMaxReads = 100;
+  var kMaxReads = 50;
   var reads = 0;
   var payloadBytesConsumed = 0;
 
@@ -109,7 +109,7 @@ function consumeMessage(connectionId, payloadSize, callback) {
             state = ReadState.READY_FOR_PAYLOAD;
           }
         } else {
-          log(kDebugError, "Expected STK_INSYNC. Got: " + hexData[i] + ". Ignoring.");
+//          log(kDebugError, "Expected STK_INSYNC. Got: " + hexData[i] + ". Ignoring.");
 //          state = ReadState.ERROR;
         }
       } else if (state == ReadState.READY_FOR_PAYLOAD) {
@@ -146,17 +146,17 @@ function consumeMessage(connectionId, payloadSize, callback) {
     } else {
       log(kDebugFine, "Paused in state: " + state + ". Reading again.");
 
-//      if (!inSync_ && (reads % 10) == 0) {
+      if (!inSync_ && (reads % 5) == 0) {
         // Mega hack (temporary)
         log(kDebugFine, "Mega Hack: Writing: " + hexRep([STK_GET_SYNC, STK_CRC_EOP]));
         chrome.serial.write(connectionId, hexToBin([STK_GET_SYNC, STK_CRC_EOP]), function() {
             // Don't tight-loop waiting for the message.
-            setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
+            setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 50);
           });
-//      } else {
-//        // Don't tight-loop waiting for the message.
-//        setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
-//      }
+      } else {
+        // Don't tight-loop waiting for the message.
+        setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 50);
+      }
 
     }
   };
@@ -205,12 +205,36 @@ function uploadOpenDone(openArg) {
     return;
   }
 
-  chrome.serial.read(openArg.connectionId, 1024, function(readArg) {
-      // Drain the connection
-      log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
+  log(kDebugFine, "Connected to board. ID: " + openArg.connectionId);
 
-      writeThenRead(openArg.connectionId, [STK_GET_SYNC, STK_CRC_EOP], 0, inSyncWithBoard);
+  chrome.serial.setControlSignals(openArg.connectionId, {dtr: false}, function(ok) {
+      dtrSent(ok, openArg.connectionId);
     });
+};
+
+function dtrSent(ok, connectionId) {
+  if (!ok) {
+    log(kDebugError, "Couldn't send DTR");
+    return;
+  }
+  log(kDebugFine, "DTR sent (low) real good");
+  chrome.serial.read(connectionId, 1024, function(readArg) {
+      drainedBytes(readArg, connectionId);
+    });
+ 
+}
+
+function drainedBytes(readArg, connectionId) {
+  log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
+  if (readArg.bytesRead == 1024) {
+    // keep draining
+    chrome.serial.read(connectionId, 1024, function(readArg) {
+        drainedBytes(readArg, connectionId);
+      });
+  } else {
+    // Start the protocol
+    writeThenRead(connectionId, [STK_GET_SYNC, STK_CRC_EOP], 0, inSyncWithBoard);
+  }
 }
 
 function inSyncWithBoard(connectionId, ok, data) {
