@@ -85,7 +85,7 @@ function consumeMessage(connectionId, payloadSize, callback) {
 
   var accum = [];
   var state = ReadState.READY_FOR_IN_SYNC;
-  var kMaxReads = 50;
+  var kMaxReads = 10;
   var reads = 0;
   var payloadBytesConsumed = 0;
 
@@ -146,23 +146,25 @@ function consumeMessage(connectionId, payloadSize, callback) {
     } else {
       log(kDebugFine, "Paused in state: " + state + ". Reading again.");
 
-      if (!inSync_ && (reads % 5) == 0) {
+      if (!inSync_ && (reads % 3) == 0) {
         // Mega hack (temporary)
         log(kDebugFine, "Mega Hack: Writing: " + hexRep([STK_GET_SYNC, STK_CRC_EOP]));
         chrome.serial.write(connectionId, hexToBin([STK_GET_SYNC, STK_CRC_EOP]), function() {
             // Don't tight-loop waiting for the message.
-            setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 50);
+//            setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 10);
+            chrome.serial.read(connectionId, 1024, handleRead);
           });
       } else {
         // Don't tight-loop waiting for the message.
-        setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 50);
+//        setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 10);
+        chrome.serial.read(connectionId, 1024, handleRead);
       }
 
     }
   };
 
   log(kDebugFine, "Scheduling a read in .1s");
-  setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 100);
+  setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 10);
 //  chrome.serial.read(connectionId, 1024, handleRead);
 }
 
@@ -170,7 +172,7 @@ function hexRep(intArray) {
   var buf = "[";
   var sep = "";
   for (var i = 0; i < intArray.length; ++i) {
-    buf += (sep + intArray[i].toString(16));
+    buf += (sep + "0x" + intArray[i].toString(16));
     sep = ",";
   }
   buf += "]";
@@ -207,9 +209,10 @@ function uploadOpenDone(openArg) {
 
   log(kDebugFine, "Connected to board. ID: " + openArg.connectionId);
 
-  chrome.serial.setControlSignals(openArg.connectionId, {dtr: false}, function(ok) {
-      dtrSent(ok, openArg.connectionId);
+  chrome.serial.read(openArg.connectionId, 1024, function(readArg) {
+      drainedBytes(readArg, openArg.connectionId);
     });
+
 };
 
 function dtrSent(ok, connectionId) {
@@ -218,10 +221,25 @@ function dtrSent(ok, connectionId) {
     return;
   }
   log(kDebugFine, "DTR sent (low) real good");
+
   chrome.serial.read(connectionId, 1024, function(readArg) {
-      drainedBytes(readArg, connectionId);
+      drainedAgain(readArg, connectionId);
     });
  
+}
+
+function drainedAgain(readArg, connectionId) {
+  log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
+  if (readArg.bytesRead == 1024) {
+    // keep draining
+    chrome.serial.read(connectionId, 1024, function(readArg) {
+        drainedBytes(readArg, connectionId);
+      });
+  } else {
+    // Start the protocol
+    setTimeout(function() { writeThenRead(connectionId, [STK_GET_SYNC, STK_CRC_EOP], 0, inSyncWithBoard); }, 50);
+  }
+
 }
 
 function drainedBytes(readArg, connectionId) {
@@ -232,8 +250,19 @@ function drainedBytes(readArg, connectionId) {
         drainedBytes(readArg, connectionId);
       });
   } else {
-    // Start the protocol
-    writeThenRead(connectionId, [STK_GET_SYNC, STK_CRC_EOP], 0, inSyncWithBoard);
+    log(kDebugFine, "About to set DTR low");
+    
+    setTimeout(function() {
+        chrome.serial.setControlSignals(connectionId, {dtr: false, rts: false}, function(ok) {
+            log(kDebugNormal, "sent dtr false, done: " + ok);
+            setTimeout(function() {
+                chrome.serial.setControlSignals(connectionId, {dtr: true, rts: true}, function(ok) {
+                    log(kDebugNormal, "sent dtr true, done: " + ok);
+                    setTimeout(function() { dtrSent(ok, connectionId); }, 500);
+                  });
+              }, 500);
+          });
+      }, 500);
   }
 }
 

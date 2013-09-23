@@ -15,14 +15,6 @@ var ids = {
   uploaderButton: "uploader_button"
 };
 
-function timestampString() {
-  var now = new Date();
-  var pad = function(n) {
-    if (n < 10) { return "0" + n; }
-    return n;
-  }
-  return pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds());
-}
 
 log(kDebugFine, "-- BEGIN --");
 document.getElementById("todevice_send")

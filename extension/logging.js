@@ -5,6 +5,15 @@ var kDebugFine = 2;
 var visibleLevel = kDebugFine;
 var consoleLevel = kDebugFine;
 
+function timestampString() {
+  var now = new Date();
+  var pad = function(n) {
+    if (n < 10) { return "0" + n; }
+    return n;
+  }
+  return pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds()) + "." + now.getMilliseconds();
+}
+
 function visibleLog(message) {
   document.getElementById(ids.statusText).innerHTML =
     "[" + timestampString() + "] " + message + 
