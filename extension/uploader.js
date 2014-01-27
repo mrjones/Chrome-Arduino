@@ -53,7 +53,7 @@ var inSync_ = false;
 function uploadCompiledSketch(hexData, serialPortName) {
   sketchData_ = hexData;
   inSync_ = false;
-  chrome.serial.open(serialPortName, { bitrate: 57600 }, uploadOpenDone);
+  chrome.serial.open(serialPortName, { bitrate: 57600 }, stkUploadOpenDone);
 }
 
 //
@@ -75,7 +75,7 @@ function uploadCompiledSketch(hexData, serialPortName) {
 //   2. boolean success: true iff a well-formed message was read
 //   3. int[] accum: if success is 'true' the payload data read (not
 //      including STK_INSYNC or STK_OK.
-function consumeMessage(connectionId, payloadSize, callback) {
+function stkConsumeMessage(connectionId, payloadSize, callback) {
   var ReadState = {
     READY_FOR_IN_SYNC: 0,
     READY_FOR_PAYLOAD: 1,
@@ -189,20 +189,21 @@ function hexRep(intArray) {
 //   does not append an STK_CRC_EOP at the end of a message, so callers must
 //   be sure to include it.
 // - int responsePayloadSize: The number of bytes expected in the response
-//   message, not including STK_INSYNC or STK_OK (see 'consumeMessage()').
-// - callback: See 'callback' in 'consumeMessage()'.
+//   message, not including STK_INSYNC or STK_OK (see 
+//   'stkConsumeMessage()').
+// - callback: See 'callback' in 'stkConsumeMessage()'.
 //   
 // TODO(mrjones): consider setting STK_CRC_EOP automatically?
-function writeThenRead(connectionId, outgoingMsg, responsePayloadSize, callback) {
+function stkWriteThenRead(connectionId, outgoingMsg, responsePayloadSize, callback) {
   log(kDebugNormal, "[" + connectionId + "] Writing: " + hexRep(outgoingMsg));
   var outgoingBinary = hexToBin(outgoingMsg);
   // schedule a read in 100ms
   chrome.serial.write(connectionId, outgoingBinary, function(writeArg) {
-      consumeMessage(connectionId, responsePayloadSize, callback);
+      stkConsumeMessage(connectionId, responsePayloadSize, callback);
     });
 }
 
-function uploadOpenDone(openArg) {
+function stkUploadOpenDone(openArg) {
   if (openArg.connectionId == -1) {
     log(kDebugError, "Couldn't connect to board");
     return;
@@ -211,12 +212,12 @@ function uploadOpenDone(openArg) {
   log(kDebugFine, "Connected to board. ID: " + openArg.connectionId);
 
   chrome.serial.read(openArg.connectionId, 1024, function(readArg) {
-      drainedBytes(readArg, openArg.connectionId);
+      stkDrainedBytes(readArg, openArg.connectionId);
     });
 
 };
 
-function dtrSent(ok, connectionId) {
+function stkDtrSent(ok, connectionId) {
   if (!ok) {
     log(kDebugError, "Couldn't send DTR");
     return;
@@ -224,31 +225,31 @@ function dtrSent(ok, connectionId) {
   log(kDebugFine, "DTR sent (low) real good");
 
   chrome.serial.read(connectionId, 1024, function(readArg) {
-      drainedAgain(readArg, connectionId);
+      stkDrainedAgain(readArg, connectionId);
     });
  
 }
 
-function drainedAgain(readArg, connectionId) {
+function stkDrainedAgain(readArg, connectionId) {
   log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
   if (readArg.bytesRead == 1024) {
     // keep draining
     chrome.serial.read(connectionId, 1024, function(readArg) {
-        drainedBytes(readArg, connectionId);
+        stkDrainedBytes(readArg, connectionId);
       });
   } else {
     // Start the protocol
-    setTimeout(function() { writeThenRead(connectionId, [STK_GET_SYNC, STK_CRC_EOP], 0, inSyncWithBoard); }, 50);
+    setTimeout(function() { stkWriteThenRead(connectionId, [STK_GET_SYNC, STK_CRC_EOP], 0, stkInSyncWithBoard); }, 50);
   }
 
 }
 
-function drainedBytes(readArg, connectionId) {
+function stkDrainedBytes(readArg, connectionId) {
   log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
   if (readArg.bytesRead == 1024) {
     // keep draining
     chrome.serial.read(connectionId, 1024, function(readArg) {
-        drainedBytes(readArg, connectionId);
+        stkDrainedBytes(readArg, connectionId);
       });
   } else {
     log(kDebugFine, "About to set DTR low");
@@ -259,7 +260,7 @@ function drainedBytes(readArg, connectionId) {
             setTimeout(function() {
                 chrome.serial.setControlSignals(connectionId, {dtr: true, rts: true}, function(ok) {
                     log(kDebugNormal, "sent dtr true, done: " + ok);
-                    setTimeout(function() { dtrSent(ok, connectionId); }, 500);
+                    setTimeout(function() { stkDtrSent(ok, connectionId); }, 500);
                   });
               }, 500);
           });
@@ -267,50 +268,50 @@ function drainedBytes(readArg, connectionId) {
   }
 }
 
-function inSyncWithBoard(connectionId, ok, data) {
+function stkInSyncWithBoard(connectionId, ok, data) {
   if (!ok) {
     log(kDebugError, "InSyncWithBoard: NOT OK");
   }
   log(kDebugNormal, "InSyncWithBoard: " + ok + " / " + data);
   inSync_ = true;
-  writeThenRead(connectionId, [STK_GET_PARAMETER, STK_HW_VER, STK_CRC_EOP], 1, readHardwareVersion);
+  stkWriteThenRead(connectionId, [STK_GET_PARAMETER, STK_HW_VER, STK_CRC_EOP], 1, stkReadHardwareVersion);
 }
 
-function readHardwareVersion(connectionId, ok, data) {
+function stkReadHardwareVersion(connectionId, ok, data) {
   log(kDebugFine, "HardwareVersion: " + ok + " / " + data);
-  writeThenRead(connectionId, [STK_GET_PARAMETER, STK_SW_VER_MAJOR, STK_CRC_EOP], 1, readSoftwareMajorVersion);
+  stkWriteThenRead(connectionId, [STK_GET_PARAMETER, STK_SW_VER_MAJOR, STK_CRC_EOP], 1, stkReadSoftwareMajorVersion);
 }
 
-function readSoftwareMajorVersion(connectionId, ok, data) {
+function stkReadSoftwareMajorVersion(connectionId, ok, data) {
   log(kDebugFine, "Software major version: " + ok + " / " + data);
-  writeThenRead(connectionId, [STK_GET_PARAMETER, STK_SW_VER_MINOR, STK_CRC_EOP], 1, readSoftwareMinorVersion);
+  stkWriteThenRead(connectionId, [STK_GET_PARAMETER, STK_SW_VER_MINOR, STK_CRC_EOP], 1, stkReadSoftwareMinorVersion);
 }
 
-function readSoftwareMinorVersion(connectionId, ok, data) {
+function stkReadSoftwareMinorVersion(connectionId, ok, data) {
   log(kDebugFine, "Software minor version: " + ok + " / " + data);
-  writeThenRead(connectionId, [STK_ENTER_PROGMODE, STK_CRC_EOP], 0, enteredProgmode);
+  stkWriteThenRead(connectionId, [STK_ENTER_PROGMODE, STK_CRC_EOP], 0, stkEnteredProgmode);
 }
 
-function enteredProgmode(connectionId, ok, data) {
+function stkEnteredProgmode(connectionId, ok, data) {
   log(kDebugNormal, "Entered progmode: " + ok + " / " + data);
-  writeThenRead(connectionId, [STK_READ_SIGN, STK_CRC_EOP], 3, readSignature);  
+  stkWriteThenRead(connectionId, [STK_READ_SIGN, STK_CRC_EOP], 3, stkReadSignature);  
 }
 
-function readSignature(connectionId, ok, data) {
+function stkReadSignature(connectionId, ok, data) {
   log(kDebugFine, "Device signature: " + ok + " / " + data);
 
-  programFlash(connectionId, sketchData_, 0, 128, doneProgramming);
+  stkProgramFlash(connectionId, sketchData_, 0, 128, stkDoneProgramming);
 }
 
-function doneProgramming(connectionId) { 
-  writeThenRead(connectionId, [STK_LEAVE_PROGMODE, STK_CRC_EOP], 0, leftProgmode); 
+function stkDoneProgramming(connectionId) { 
+  stkWriteThenRead(connectionId, [STK_LEAVE_PROGMODE, STK_CRC_EOP], 0, stkLeftProgmode); 
 }
 
-function leftProgmode(connectionId, ok, data) {
+function stkLeftProgmode(connectionId, ok, data) {
   log(kDebugNormal, "Left progmode: " + ok + " / " + data);
 }
 
-function programFlash(connectionId, data, offset, length, doneCallback) {
+function stkProgramFlash(connectionId, data, offset, length, doneCallback) {
   log(kDebugFine, "program flash: data.length: " + data.length + ", offset: " + offset + ", length: " + length);
   var payload;
 
@@ -345,12 +346,12 @@ function programFlash(connectionId, data, offset, length, doneCallback) {
   programMessage = programMessage.concat(payload);
   programMessage.push(STK_CRC_EOP);
 
-  writeThenRead(connectionId, loadAddressMessage, 0, function(connectionId, ok, reponse) {
+  stkWriteThenRead(connectionId, loadAddressMessage, 0, function(connectionId, ok, reponse) {
       if (!ok) { log(kDebugError, "Error programming the flash (load address)"); return; }
-      writeThenRead(connectionId, programMessage, 0, function(connectionId, ok, response) {
+      stkWriteThenRead(connectionId, programMessage, 0, function(connectionId, ok, response) {
           if (!ok) { log(kDebugError, "Error programming the flash (send data)"); return }
           // Program the next section
-          programFlash(connectionId, data, offset + length, length, doneCallback);
+          stkProgramFlash(connectionId, data, offset + length, length, doneCallback);
         });
     });
 }
