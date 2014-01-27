@@ -26,11 +26,12 @@ var STK_SW_VER_MINOR = 0x82;
 ////
 
 
-function uploadBlinkSketch(serialPort) {
+function uploadBlinkSketch(serialPort, protocol) {
   log(kDebugFine, "uploading blink sketch");
   fetchProgram('http://linode.mrjon.es/blink.hex', function(programBytes) { 
       log(kDebugFine, "Fetched program. Uploading to: " + serialPort);
-      uploadCompiledSketch(programBytes, serialPort);
+      log(kDebugFine, "Protocol: " + protocol);
+      uploadCompiledSketch(programBytes, serialPort, protocol);
     });
 }
 
@@ -50,10 +51,16 @@ function fetchProgram(url, handler) {
 var sketchData_;
 var inSync_ = false;
 
-function uploadCompiledSketch(hexData, serialPortName) {
+function uploadCompiledSketch(hexData, serialPortName, protocol) {
   sketchData_ = hexData;
   inSync_ = false;
-  chrome.serial.open(serialPortName, { bitrate: 57600 }, stkUploadOpenDone);
+  if (protocol == "stk500") {
+    chrome.serial.open(serialPortName, { bitrate: 57600 }, stkUploadOpenDone);
+  } else if (protocol == "avr109") {
+    log(kDebugNormal, "About to implement AVR109");
+  } else {
+    log(kDebugError, "Unknown protocol: "  + protocol);
+  }
 }
 
 //
@@ -363,7 +370,7 @@ function storeAsTwoBytes(n) {
   return [hi, lo];
 }
 
-function waitForSync(connectionId) {
+function stkWaitForSync(connectionId) {
   log(kDebugFine, "readying sync bit from: " + connectionId);
   var hex = [STK_GET_SYNC, STK_CRC_EOP];
   var data = hexToBin(hex);

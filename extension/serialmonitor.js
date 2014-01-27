@@ -37,7 +37,6 @@ document.getElementById(ids.uploaderButton)
 
 document.getElementById("test_fetch")
   .addEventListener('click', testFetch);
-log(kDebugFine, "Listeners attached.");
 
 document.getElementById(ids.disconnectButton).disabled = true;
 document.getElementById(ids.sendButton).disabled = true;
@@ -51,7 +50,10 @@ function testFetch() {
 function testUploader() {
   var portMenu = document.getElementById("ports_menu");
   var selectedPort = portMenu.options[portMenu.selectedIndex].text;
-  uploadBlinkSketch(selectedPort);
+
+  var protocolMenu = document.getElementById("protocol");
+  var protocol = protocolMenu.options[protocolMenu.selectedIndex].value;
+  uploadBlinkSketch(selectedPort, protocol);
 }
 
 function doOnEnter(targetFunction) {
