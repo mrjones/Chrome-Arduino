@@ -28,7 +28,7 @@ var STK_SW_VER_MINOR = 0x82;
 
 function uploadBlinkSketch(serialPort) {
   log(kDebugFine, "uploading blink sketch");
-  fetchProgram('/blink-example.hex', function(programBytes) { 
+  fetchProgram('http://linode.mrjon.es/blink.hex', function(programBytes) { 
       log(kDebugFine, "Fetched program. Uploading to: " + serialPort);
       uploadCompiledSketch(programBytes, serialPort);
     });
@@ -39,6 +39,7 @@ function fetchProgram(url, handler) {
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
       var programBytes = ParseHexFile(xhr.responseText);
+      log(kDebugFine, "Program Data: " + xhr.responseText.substring(0,25) + "...");
       handler(programBytes);
     }
   };

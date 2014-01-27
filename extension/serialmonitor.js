@@ -34,10 +34,19 @@ document.getElementById(ids.sendText)
 
 document.getElementById(ids.uploaderButton)
   .addEventListener('click', testUploader);
+
+document.getElementById("test_fetch")
+  .addEventListener('click', testFetch);
 log(kDebugFine, "Listeners attached.");
 
 document.getElementById(ids.disconnectButton).disabled = true;
 document.getElementById(ids.sendButton).disabled = true;
+
+function testFetch() {
+    fetchProgram("http://linode.mrjon.es/blink.hex", function(data) {
+        log(kDebugFine, "Got data!");
+    });
+}
 
 function testUploader() {
   var portMenu = document.getElementById("ports_menu");

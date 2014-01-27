@@ -11,7 +11,8 @@
   "permissions": [
     "extension",
     "serial",
-    "usb"
+    "usb",
+    "http://linode.mrjon.es/"
   ],
   "web_accessible_resources": [
     "blink-example.hex"
