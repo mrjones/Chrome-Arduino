@@ -7,12 +7,17 @@
 var page = require('webpage').create();
 var url = './extension/unittest.html';
 
+page.onConsoleMessage = function (msg) { console.log(msg); };
+
 page.open(url, function (status) {
-    if (status == "fail") {
-      console.log("Couldn't load: " + url);
-      phantom.exit();
-      return;
-    }
+  if (status == "fail") {
+    console.log("Couldn't load: " + url);
+    phantom.exit();
+    return;
+  }
+  
+  try {
+
     var results = page.evaluate( function() {
       return Test.StructuredResults;
     });
@@ -36,5 +41,8 @@ page.open(url, function (status) {
     } else {
       console.log("[FAIL] " + failCount + " of " + testCount + " tests failed");
     }
-    phantom.exit();
+  } catch (e) {
+    console.log("Caught: " + e);
+  }
+  phantom.exit();
 });
