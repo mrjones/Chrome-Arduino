@@ -15,6 +15,7 @@ var ids = {
   uploaderButton: "uploader_button"
 };
 
+configureVisibleLogging(ids.statusText);
 
 log(kDebugFine, "-- BEGIN --");
 document.getElementById("todevice_send")

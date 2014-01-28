@@ -5,6 +5,12 @@ var kDebugFine = 2;
 var visibleLevel = kDebugFine;
 var consoleLevel = kDebugFine;
 
+var visibleLoggingDiv_ = "";
+
+function configureVisibleLogging(divName) {
+  visibleLoggingDiv_ = divName;
+}
+
 function timestampString() {
   var now = new Date();
   var pad = function(n) {
@@ -15,9 +21,11 @@ function timestampString() {
 }
 
 function visibleLog(message) {
-  document.getElementById(ids.statusText).innerHTML =
-    "[" + timestampString() + "] " + message + 
-    "<br/>" + document.getElementById(ids.statusText).innerHTML;
+  if (visibleLoggingDiv_ != "") {
+    document.getElementById(visibleLoggingDiv_).innerHTML =
+      "[" + timestampString() + "] " + message + 
+      "<br/>" + document.getElementById(visibleLoggingDiv_).innerHTML;
+  }
 }
 
 function consoleLog(message) {

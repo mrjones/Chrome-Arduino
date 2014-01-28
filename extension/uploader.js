@@ -402,7 +402,6 @@ function binToHex(bin) {
 function findMissingNeedlesInHaystack(needles, haystack) {
   var r = [];
   for (var i = 0; i < needles.length; ++i) {
-    log(kDebugFine, "needles[" + i + "]: " + needles[i]);
     if (haystack.indexOf(needles[i]) == -1) {
       r.push(needles[i]);
     }
@@ -420,13 +419,9 @@ function waitForNewPort(oldPorts, deadline) {
 
   var found = false;
   chrome.serial.getPorts(function(newPorts) {
-    log(kDebugFine, newPorts.length + " ports");
     var appeared = findMissingNeedlesInHaystack(newPorts, oldPorts);
     var disappeared = findMissingNeedlesInHaystack(oldPorts, newPorts);
  
-    log(kDebugFine, "Disappeared: "  + disappeared.length + 
-        ", Appeared: " + appeared.length);
-     
     for (var i = 0; i < disappeared.length; ++i) {
       log(kDebugNormal, "Disappeared: " + disappeared[i]);
     }
@@ -435,7 +430,6 @@ function waitForNewPort(oldPorts, deadline) {
     }
 
     if (appeared.length == 0) {
-      log(kDebugFine, "No new ports");
       setTimeout(function() { waitForNewPort(newPorts, deadline); }, 500);
     } else {
       log(kDebugNormal, "Aha! Connecting to: " + appeared[0]);
@@ -449,8 +443,6 @@ function kickLeonardoBootloader(originalPortName) {
   var kMagicBaudRate = 1200;
   var oldPorts = [];
   chrome.serial.getPorts(function(portsArg) {
-    log(kDebugFine, "Warmed up (enumerated ports)");
-    log(kDebugFine, portsArg.length + " ports");
     oldPorts = portsArg;
     chrome.serial.open(originalPortName, { bitrate: kMagicBaudRate }, function(openArg) {
       log(kDebugNormal, "Made sentinel connection to " + originalPortName);
@@ -532,7 +524,7 @@ function avrDrainedAgain(readArg, connectionId) {
   } else {
     // Start the protocol
 
-    avrWriteThenRead(connectionId, [ 0x56 ], 2, avrGotVersion);
+    avrWriteThenRead(connectionId, [ 0x53 ], 7, avrGotVersion);
   }
 }
 
