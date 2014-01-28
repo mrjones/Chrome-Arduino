@@ -439,6 +439,7 @@ function waitForNewPort(oldPorts, deadline) {
 }
 
 function kickLeonardoBootloader(originalPortName) {
+int i
   log(kDebugNormal, "kickLeonardoBootloader(" + originalPortName + ")");
   var kMagicBaudRate = 1200;
   var oldPorts = [];
