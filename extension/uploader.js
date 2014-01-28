@@ -29,10 +29,10 @@ var STK_SW_VER_MINOR = 0x82;
 function uploadBlinkSketch(serialPort, protocol) {
   log(kDebugFine, "uploading blink sketch");
   fetchProgram('http://linode.mrjon.es/blink.hex', function(programBytes) { 
-      log(kDebugFine, "Fetched program. Uploading to: " + serialPort);
-      log(kDebugFine, "Protocol: " + protocol);
-      uploadCompiledSketch(programBytes, serialPort, protocol);
-    });
+    log(kDebugFine, "Fetched program. Uploading to: " + serialPort);
+    log(kDebugFine, "Protocol: " + protocol);
+    uploadCompiledSketch(programBytes, serialPort, protocol);
+  });
 }
 
 function fetchProgram(url, handler) {
@@ -57,11 +57,13 @@ function uploadCompiledSketch(hexData, serialPortName, protocol) {
   if (protocol == "stk500") {
     chrome.serial.open(serialPortName, { bitrate: 57600 }, stkUploadOpenDone);
   } else if (protocol == "avr109") {
-    log(kDebugNormal, "About to implement AVR109");
+    // actually want tocheck that board is leonardo / micro / whatever
+    kickLeonardoBootloader(serialPortName);
   } else {
     log(kDebugError, "Unknown protocol: "  + protocol);
   }
 }
+
 
 //
 // Internal/implementation
@@ -395,4 +397,181 @@ function binToHex(bin) {
     hexes.push(bufferView[i]);
   }
   return hexes;
+}
+
+function findMissingNeedlesInHaystack(needles, haystack) {
+  var r = [];
+  for (var i = 0; i < needles.length; ++i) {
+    log(kDebugFine, "needles[" + i + "]: " + needles[i]);
+    if (haystack.indexOf(needles[i]) == -1) {
+      r.push(needles[i]);
+    }
+  }
+
+  return r;
+}
+
+function waitForNewPort(oldPorts, deadline) {
+  log(kDebugFine, "Waiting for new port...");
+  if (new Date().getTime() > deadline) {
+    log(kDebugError, "Exceeded deadline");
+    return;
+  }
+
+  var found = false;
+  chrome.serial.getPorts(function(newPorts) {
+    log(kDebugFine, newPorts.length + " ports");
+    var appeared = findMissingNeedlesInHaystack(newPorts, oldPorts);
+    var disappeared = findMissingNeedlesInHaystack(oldPorts, newPorts);
+ 
+    log(kDebugFine, "Disappeared: "  + disappeared.length + 
+        ", Appeared: " + appeared.length);
+     
+    for (var i = 0; i < disappeared.length; ++i) {
+      log(kDebugNormal, "Disappeared: " + disappeared[i]);
+    }
+    for (var i = 0; i < appeared.length; ++i) {
+      log(kDebugNormal, "Appeared: " + appeared[i]);
+    }
+
+    if (appeared.length == 0) {
+      log(kDebugFine, "No new ports");
+      setTimeout(function() { waitForNewPort(newPorts, deadline); }, 500);
+    } else {
+      log(kDebugNormal, "Aha! Connecting to: " + appeared[0]);
+      chrome.serial.open(appeared[0], { bitrate: 57600 }, avrUploadOpenDone);
+    }
+  });
+}
+
+function kickLeonardoBootloader(originalPortName) {
+  log(kDebugNormal, "kickLeonardoBootloader(" + originalPortName + ")");
+  var kMagicBaudRate = 1200;
+  var oldPorts = [];
+  chrome.serial.getPorts(function(portsArg) {
+    log(kDebugFine, "Warmed up (enumerated ports)");
+    log(kDebugFine, portsArg.length + " ports");
+    oldPorts = portsArg;
+    chrome.serial.open(originalPortName, { bitrate: kMagicBaudRate }, function(openArg) {
+      log(kDebugNormal, "Made sentinel connection to " + originalPortName);
+      chrome.serial.close(openArg.connectionId, function(disconnectArg) {
+        log(kDebugNormal, "Disconnected from " + originalPortName);
+        waitForNewPort(oldPorts, (new Date().getTime()) + 10000);
+//        setTimeout(function() {
+//          chrome.serial.open(originalPortName, { bitrate: 57600 }, avrUploadOpenDone);
+//        }, 300);
+      });
+    });
+  });
+
+}
+
+
+function avrUploadOpenDone(openArg) {
+  if (openArg.connectionId == -1) {
+    log(kDebugError, "Couldn't connect to board");
+    return;
+  }
+
+  log(kDebugFine, "Connected to board. ID: " + openArg.connectionId);
+
+  chrome.serial.read(openArg.connectionId, 1024, function(readArg) {
+      avrDrainedBytes(readArg, openArg.connectionId);
+    });
+
+};
+
+function avrWaitForBytes(connectionId, n, accum, deadline, callback) {
+  if (new Date().getTime() > deadline) {
+    log(kDebugError, "Deadline passed while waiting for " + n + " bytes");
+    return;
+  }
+  log(kDebugFine, "Deadline: " + deadline + ", Now: " + (new Date().getTime()));
+  log(kDebugNormal, "Waiting for " + n + " bytes");
+
+  var handler = function(readArg) {
+    var hexData = binToHex(readArg.data);
+    for (var i = 0; i < hexData.length; ++i) {
+      accum.push(hexData[i]);
+      n--;
+    }
+
+    if (n < 0) {
+      log(kDebugError, "Read too many bytes !?");
+    } else if (n == 0) {
+      callback(connectionId, accum);
+    } else { // still want more data 
+      setTimeout(function() {
+        avrWaitForBytes(connectionId, n, accum, deadline, callback);
+      });
+      // TODO: deadline?
+    }
+  }
+
+  chrome.serial.read(connectionId, n, handler);
+}
+
+function avrWriteThenRead(connectionId, writePayload, readSize, callback) {
+  log(kDebugFine, "Writing: " + hexRep(writePayload));
+  chrome.serial.write(connectionId, hexToBin(writePayload), function(writeARg) {
+    avrWaitForBytes(connectionId, readSize, [], (new Date().getTime()) + 1000,callback);
+  });
+}
+
+function avrGotVersion(connectionId, version) {
+  log(kDebugNormal, "Got version: " + version);
+}
+
+function avrDrainedAgain(readArg, connectionId) {
+  log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
+  if (readArg.bytesRead == 1024) {
+    // keep draining
+    chrome.serial.read(connectionId, 1024, function(readArg) {
+        avrDrainedBytes(readArg, connectionId);
+      });
+  } else {
+    // Start the protocol
+
+    avrWriteThenRead(connectionId, [ 0x56 ], 2, avrGotVersion);
+  }
+}
+
+function avrDrainedBytes(readArg, connectionId) {
+  log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
+  if (readArg.bytesRead == 1024) {
+    // keep draining
+    chrome.serial.read(connectionId, 1024, function(readArg) {
+        avrDrainedBytes(readArg, connectionId);
+      });
+  } else {
+    setTimeout(function() { avrDtrSent(true, connectionId); }, 1000);
+    /*
+    log(kDebugFine, "About to set DTR low");
+    
+    setTimeout(function() {
+        chrome.serial.setControlSignals(connectionId, {dtr: false, rts: false}, function(ok) {
+            log(kDebugNormal, "sent dtr false, done: " + ok);
+            setTimeout(function() {
+                chrome.serial.setControlSignals(connectionId, {dtr: true, rts: true}, function(ok) {
+                    log(kDebugNormal, "sent dtr true, done: " + ok);
+                    setTimeout(function() { avrDtrSent(ok, connectionId); }, 500);
+                  });
+              }, 500);
+          });
+      }, 500);
+    */
+  }
+}
+
+function avrDtrSent(ok, connectionId) {
+  if (!ok) {
+    log(kDebugError, "Couldn't send DTR");
+    return;
+  }
+  log(kDebugFine, "DTR sent (low) real good");
+
+  chrome.serial.read(connectionId, 1024, function(readArg) {
+      avrDrainedAgain(readArg, connectionId);
+    });
+ 
 }

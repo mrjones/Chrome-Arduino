@@ -84,7 +84,7 @@ var UploaderTest = {
   pass: function() { return { passed: true }; },
 
   foo: function() {
-    uploadCompiledSketch([0x00, 0x01], "serialportname");
+    uploadCompiledSketch([0x00, 0x01], "serialportname", "stk500");
     setTimeout(1000, function() {
       if (FakeBoard.state_ != BoardStates.IN_SYNC) {
         Test.Fail("Never made it to IN_SYNC state");
