@@ -26,9 +26,15 @@ var STK_SW_VER_MINOR = 0x82;
 ////
 
 
+// TODO: board and prototocol should be separate variables
 function uploadBlinkSketch(serialPort, protocol) {
   log(kDebugFine, "uploading blink sketch");
-  fetchProgram('http://linode.mrjon.es/blink.hex', function(programBytes) { 
+  var hexfile = 'http://linode.mrjon.es/blink.hex';
+  if (protocol == 'avr109') {
+    hexfile = 'http://linode.mrjon.es/blink-micro.hex'
+  }
+
+  fetchProgram(hexfile, function(programBytes) { 
     log(kDebugFine, "Fetched program. Uploading to: " + serialPort);
     log(kDebugFine, "Protocol: " + protocol);
     uploadCompiledSketch(programBytes, serialPort, protocol);
@@ -36,6 +42,7 @@ function uploadBlinkSketch(serialPort, protocol) {
 }
 
 function fetchProgram(url, handler) {
+  log(kDebugFine, "Fetching: " + url)
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
@@ -214,7 +221,7 @@ function stkWriteThenRead(connectionId, outgoingMsg, responsePayloadSize, callba
 
 function stkUploadOpenDone(openArg) {
   if (openArg.connectionId == -1) {
-    log(kDebugError, "Couldn't connect to board");
+    log(kDebugError, "Bad connectionId / Couldn't connect to board");
     return;
   }
 
@@ -430,10 +437,11 @@ function waitForNewPort(oldPorts, deadline) {
     }
 
     if (appeared.length == 0) {
-      setTimeout(function() { waitForNewPort(newPorts, deadline); }, 500);
+      setTimeout(function() { waitForNewPort(newPorts, deadline); }, 100);
     } else {
       log(kDebugNormal, "Aha! Connecting to: " + appeared[0]);
-      chrome.serial.open(appeared[0], { bitrate: 57600 }, avrUploadOpenDone);
+      setTimeout(function() {
+        chrome.serial.open(appeared[0], { bitrate: 57600 }, avrUploadOpenDone)}, 500);
     }
   });
 }
@@ -461,7 +469,7 @@ function kickLeonardoBootloader(originalPortName) {
 
 function avrUploadOpenDone(openArg) {
   if (openArg.connectionId == -1) {
-    log(kDebugError, "Couldn't connect to board");
+    log(kDebugError, "(AVR) Bad connectionId / Couldn't connect to board");
     return;
   }
 
@@ -478,7 +486,7 @@ function avrWaitForBytes(connectionId, n, accum, deadline, callback) {
     log(kDebugError, "Deadline passed while waiting for " + n + " bytes");
     return;
   }
-  log(kDebugFine, "Deadline: " + deadline + ", Now: " + (new Date().getTime()));
+//  log(kDebugFine, "Deadline: " + deadline + ", Now: " + (new Date().getTime()));
   log(kDebugNormal, "Waiting for " + n + " bytes");
 
   var handler = function(readArg) {
@@ -491,11 +499,12 @@ function avrWaitForBytes(connectionId, n, accum, deadline, callback) {
     if (n < 0) {
       log(kDebugError, "Read too many bytes !?");
     } else if (n == 0) {
+      log(kDebugFine, "Response: " + hexRep(accum));
       callback(connectionId, accum);
     } else { // still want more data 
       setTimeout(function() {
         avrWaitForBytes(connectionId, n, accum, deadline, callback);
-      });
+      }, 50);
       // TODO: deadline?
     }
   }
@@ -503,15 +512,44 @@ function avrWaitForBytes(connectionId, n, accum, deadline, callback) {
   chrome.serial.read(connectionId, n, handler);
 }
 
+var AVR = {
+  SOFTWARE_VERSION: 0x56,
+  ENTER_PROGRAM_MODE: 0x50,
+  LEAVE_PROGRAM_MODE: 0x4c,
+  SET_ADDRESS: 0x41,
+  WRITE: 0x42,
+  TYPE_FLASH: 0x46,
+  EXIT_BOOTLOADER: 0x45,
+};
+
 function avrWriteThenRead(connectionId, writePayload, readSize, callback) {
   log(kDebugFine, "Writing: " + hexRep(writePayload));
   chrome.serial.write(connectionId, hexToBin(writePayload), function(writeARg) {
-    avrWaitForBytes(connectionId, readSize, [], (new Date().getTime()) + 1000,callback);
+    avrWaitForBytes(connectionId, readSize, [], (new Date().getTime()) + 1000, callback);
   });
 }
 
 function avrGotVersion(connectionId, version) {
   log(kDebugNormal, "Got version: " + version);
+  avrPrepareToProgramFlash(connectionId, sketchData_, avrProgrammingDone);
+}
+
+function avrEnterProgramMode(connectionId) {
+  avrWriteThenRead(
+    connectionId, [ AVR.ENTER_PROGRAM_MODE ], 1,
+    function(connectionId, payload) {
+      avrProgramFlash(connectionId, sketch_data_, 0, 128, avrProgrammingDone);
+    });
+}
+
+
+function avrProgrammingDone(connectionId) {
+  log(kDebugNormal, "avrProgrammingDone");
+  avrWriteThenRead(connectionId, [ AVR.LEAVE_PROGRAM_MODE ], 1, function(connectionId, payload) {
+    avrWriteThenRead(connectionId, [ AVR.EXIT_BOOTLOADER ], 1, function(connection, payload) {
+      log(kDebugNormal, "ALL DONE");
+    });
+  });
 }
 
 function avrDrainedAgain(readArg, connectionId) {
@@ -524,7 +562,7 @@ function avrDrainedAgain(readArg, connectionId) {
   } else {
     // Start the protocol
 
-    avrWriteThenRead(connectionId, [ 0x53 ], 7, avrGotVersion);
+    avrWriteThenRead(connectionId, [ AVR.SOFTWARE_VERSION ], 2, avrGotVersion);
   }
 }
 
@@ -561,9 +599,62 @@ function avrDtrSent(ok, connectionId) {
     return;
   }
   log(kDebugFine, "DTR sent (low) real good");
-
+  
   chrome.serial.read(connectionId, 1024, function(readArg) {
-      avrDrainedAgain(readArg, connectionId);
-    });
+    avrDrainedAgain(readArg, connectionId);
+  }); 
+}
+  
+function avrPrepareToProgramFlash(connectionId, data, doneCallback) {
+  var addressBytes = storeAsTwoBytes(0);
+
+  var loadAddressMessage = [
+    AVR.SET_ADDRESS, addressBytes[1], addressBytes[0] ];
+
+  avrWriteThenRead(connectionId, loadAddressMessage, 1, function(connectionId, response) {
+    avrProgramFlash(connectionId, data, 0, 128, avrProgrammingDone);
+  });
+}
+    
+function avrProgramFlash(connectionId, data, offset, length, doneCallback) {
+  log(kDebugFine, "program flash: data.length: " + data.length + ", offset: " + offset + ", length: " + length);
+  var payload;
  
+  if (offset >= data.length) {
+    log(kDebugNormal, "Done programming flash");
+    doneCallback(connectionId);
+    return;
+  }
+
+  if (offset + length > data.length) {
+    log(kDebugFine, "Grabbing bytes " + offset + " to " +
+        data.length + " bytes would go past the end.");
+    payload = data.slice(offset, data.length);
+    var padSize = length - payload.length;
+    log(kDebugFine, "Padding " + padSize + " 0 byte at the end");
+    for (var i = 0; i < padSize; ++i) {
+      payload.push(0);
+    }
+  } else {
+    log(kDebugFine, "Grabbing bytes: " + offset + " until " + (offset + length));
+    payload = data.slice(offset, offset + length);
+  }
+
+  var sizeBytes = storeAsTwoBytes(length);
+  var kFlashMemoryType = 0x46;
+
+  
+
+  var programMessage = [
+    AVR.WRITE, sizeBytes[0], sizeBytes[1], AVR.TYPE_FLASH ];
+  programMessage = programMessage.concat(payload);
+
+  avrWriteThenRead(connectionId, programMessage, 1, function(connectionId, response) {
+    avrProgramFlash(connectionId, data, offset + length, length, doneCallback);
+  });
+
+//  log(kDebugNormal, "Want to write: " + hexRep(loadAddressMessage));
+//  log(kDebugNormal, "Then: " + hexRep(programMessage));
+
+//  avrProgramFlash(connectionId, data, offset + length, length, doneCallback);
 }
