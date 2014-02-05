@@ -9,6 +9,17 @@ var url = './extension/unittest.html';
 
 page.onConsoleMessage = function (msg) { console.log(msg); };
 
+page.onError = function (msg, trace) {
+  console.log("==");
+  console.log("== ERROR");
+  console.log("== Message: " + msg);
+  console.log("== Trace elements: " + trace.length);
+  trace.forEach(function(item) {
+    console.log('== > ', item.file, ':', item.line);
+  });
+  console.log("==");
+}
+
 page.open(url, function (status) {
   if (status == "fail") {
     console.log("Couldn't load: " + url);

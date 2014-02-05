@@ -1,3 +1,24 @@
+var AsyncTest = {
+  State: {
+    IDLE: "idle",
+    RUNNING: "running",
+    WAITING: "waiting"
+  },
+
+  Run: function(testCaseName, testCase) {
+    for (testName in testCase) {
+      var done = function() { console.log(testName + " is done"); };
+      console.log("Getting ready to run " + testName);
+      setTimeout(function() { Timeout(testName); }, 1000);
+      testCase[testName](done);
+    }
+  },
+
+  Timeout: function(testName) {
+    console.log(testName + " timed out");
+  }
+};
+
 var Test = {
   StructuredResults: [],
   Run: function(testCaseName, testCase) {

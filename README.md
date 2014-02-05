@@ -10,4 +10,4 @@ Unit Tests
 
 Either:
 - Open `extension/unittest.html` in a browser
-- Or, Use [PhantomJS](http://phantomjs.org): `path/to/phantomjs extension/tuntests_phantom.js `
+- Or, Use [PhantomJS](http://phantomjs.org): `path/to/phantomjs extension/runtests_phantom.js `

@@ -81,8 +81,12 @@ var FakeBoard = {
 var chrome = { serial: FakeBoard };
 
 var UploaderTest = {
-  pass: function() { return { passed: true }; },
+  pass: function(doneCb) {
+    console.log("pass is running");
+    doneCb({ passed: true });
+  }
 
+/*
   foo: function() {
     uploadCompiledSketch([0x00, 0x01], "serialportname", "stk500");
     setTimeout(1000, function() {
@@ -92,6 +96,8 @@ var UploaderTest = {
       Test.Fail("xxx");
     });
   }
+*/
 };
 
-Test.Run("UploaderTest", UploaderTest);
+//Test.Run("UploaderTest", UploaderTest);
+AsyncTest.Run("UploaderTest", UploaderTest);
