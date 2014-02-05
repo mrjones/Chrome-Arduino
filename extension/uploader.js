@@ -220,7 +220,9 @@ function stkWriteThenRead(connectionId, outgoingMsg, responsePayloadSize, callba
 }
 
 function stkUploadOpenDone(openArg) {
-  if (openArg.connectionId == -1) {
+  if (openArg == undefined ||
+      openArg.connectionId == undefined ||
+      openArg.connectionId == -1) {
     log(kDebugError, "Bad connectionId / Couldn't connect to board");
     return;
   }
@@ -468,7 +470,9 @@ function kickLeonardoBootloader(originalPortName) {
 
 
 function avrUploadOpenDone(openArg) {
-  if (openArg.connectionId == -1) {
+  if (typeof(openArg) == undefined ||
+      typeof(openArg.connectionId) == undefined ||
+      openArg.connectionId == -1) {
     log(kDebugError, "(AVR) Bad connectionId / Couldn't connect to board");
     return;
   }
