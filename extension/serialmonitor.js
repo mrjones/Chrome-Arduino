@@ -7,8 +7,8 @@ var connectionId_ = kUnconnected;
 var ids = {
   connectButton: "connect",
   disconnectButton: "disconnect",
-  refreshPortsButton: "ports_refresh",
-  refreshPortsMenu: "ports_menu",
+  refreshDevicesButton: "devices_refresh",
+  refreshDevicesMenu: "devices_menu",
   sendText: "todevice_data",
   sendButton: "todevice_send",
   statusText: "status",
@@ -21,8 +21,8 @@ log(kDebugFine, "-- BEGIN --");
 document.getElementById("todevice_send")
   .addEventListener('click', sendDataToDevice);
 
-document.getElementById(ids.refreshPortsButton)
-  .addEventListener('click', detectPorts);
+document.getElementById(ids.refreshDevicesButton)
+  .addEventListener('click', detectDevices);
 
 document.getElementById(ids.connectButton)
   .addEventListener('click', connectToSelectedSerialPort);
@@ -49,7 +49,7 @@ function testFetch() {
 }
 
 function testUploader() {
-  var portMenu = document.getElementById("ports_menu");
+  var portMenu = document.getElementById("devices_menu");
   var selectedPort = portMenu.options[portMenu.selectedIndex].text;
 
   var protocolMenu = document.getElementById("protocol");
@@ -65,21 +65,21 @@ function doOnEnter(targetFunction) {
   }
 }
 
-function detectPorts() {
-  var menu = document.getElementById("ports_menu");
+function detectDevices() {
+  var menu = document.getElementById("devices_menu");
   menu.options.length = 0;
-  chrome.serial.getPorts(function(ports) {
-    for (var i = 0; i < ports.length; ++i) {
-      log(kDebugFine, ports[i]);
+  chrome.serial.getDevices(function(devices) {
+    for (var i = 0; i < devices.length; ++i) {
+      log(kDebugFine, devices[i].path);
       var portOpt = document.createElement("option");
-      portOpt.text = ports[i];
+      portOpt.text = devices[i].path;
       menu.add(portOpt, null);
     }
   });
   return false; // Don't submit the form
 }
 
-detectPorts();
+detectDevices();
 
 function sendDataToDevice() {
   if (connectionId_ == kUnconnected) {
@@ -97,8 +97,8 @@ function serialOpenDone(openArg) {
   }
   connectionId_ = openArg.connectionId;
   document.getElementById(ids.connectButton).disabled = true;
-  document.getElementById(ids.refreshPortsButton).disabled = true;
-  document.getElementById(ids.refreshPortsMenu).disabled = true;
+  document.getElementById(ids.refreshDevicesButton).disabled = true;
+  document.getElementById(ids.refreshDevicesMenu).disabled = true;
 
   document.getElementById(ids.disconnectButton).disabled = false;
   document.getElementById(ids.sendButton).disabled = false;
@@ -107,7 +107,7 @@ function serialOpenDone(openArg) {
 }
 
 function connectToSelectedSerialPort() {
-  var portMenu = document.getElementById("ports_menu");
+  var portMenu = document.getElementById("devices_menu");
   var selectedPort = portMenu.options[portMenu.selectedIndex].text;
   log(kDebugNormal, "Using port: " + selectedPort);
   chrome.serial.open(selectedPort, {bitrate: kBitrate}, serialOpenDone);
@@ -116,8 +116,8 @@ function connectToSelectedSerialPort() {
 function disconnectDone(disconnectArg) {
   connectionId_ = kUnconnected;
   document.getElementById(ids.connectButton).disabled = false;
-  document.getElementById(ids.refreshPortsButton).disabled = false;
-  document.getElementById(ids.refreshPortsMenu).disabled = false;
+  document.getElementById(ids.refreshDevicesButton).disabled = false;
+  document.getElementById(ids.refreshDevicesMenu).disabled = false;
 
   document.getElementById(ids.disconnectButton).disabled = true;
   document.getElementById(ids.sendButton).disabled = true;
