@@ -89,13 +89,13 @@ function sendDataToDevice() {
   }
 }
 
-function serialOpenDone(openArg) {
-  log(kDebugFine, "ON OPEN:" + JSON.stringify(openArg));
-  if (!openArg || openArg.connectionId == -1) {
-    log(kDebugError, "Error. Could not open connection.");
+function serialConnectDone(connectArg) {
+  log(kDebugFine, "ON CONNECT:" + JSON.stringify(connectArg));
+  if (!connectArg || connectArg.connectionId == -1) {
+    log(kDebugError, "Error. Could not connect.");
     return;
   }
-  connectionId_ = openArg.connectionId;
+  connectionId_ = connectArg.connectionId;
   document.getElementById(ids.connectButton).disabled = true;
   document.getElementById(ids.refreshDevicesButton).disabled = true;
   document.getElementById(ids.refreshDevicesMenu).disabled = true;
@@ -103,14 +103,15 @@ function serialOpenDone(openArg) {
   document.getElementById(ids.disconnectButton).disabled = false;
   document.getElementById(ids.sendButton).disabled = false;
   log(kDebugNormal, "CONNECTION ID: " + connectionId_);
-  scheduleRepeatingRead();
+
+  chrome.serial.onReceive.addListener(readHandler);
 }
 
 function connectToSelectedSerialPort() {
   var portMenu = document.getElementById("devices_menu");
   var selectedPort = portMenu.options[portMenu.selectedIndex].text;
   log(kDebugNormal, "Using port: " + selectedPort);
-  chrome.serial.open(selectedPort, {bitrate: kBitrate}, serialOpenDone);
+  chrome.serial.connect(selectedPort, {bitrate: kBitrate}, serialConnectDone);
 }
 
 function disconnectDone(disconnectArg) {
@@ -129,7 +130,7 @@ function disconnect() {
     log(kDebugNormal, "Can't disconnect: Already disconnected!");
     return;
   }
-  chrome.serial.close(connectionId_, disconnectDone);
+  chrome.serial.disconnect(connectionId_, disconnectDone);
 }
 
 function doSend() {
@@ -165,31 +166,19 @@ function binaryToString(buffer) {
   return String.fromCharCode.apply(null, chars);
 }
 
-function scheduleRepeatingRead() {
-  setTimeout(tryRead, 100);
-}
-
-function tryRead() {
-  chrome.serial.read(connectionId_, 1024, readDone);
-}
-
-function readDone(readArg) {
-  if (readArg && readArg.bytesRead > 0 && readArg.data) {
-    var str = binaryToString(readArg.data);
-    str.replace("\n", "<br/>");
-    // XSS like woah, but who cares.
-    document.getElementById("fromdevice_data").innerHTML += str;
-    tryRead();
-  } else {
-    scheduleRepeatingRead();
-  }
+function readHandler(readArg) {
+  // TODO: check connection id
+  var str = binaryToString(readArg.data);
+  str.replace("\n", "<br/>");
+  // XSS like woah, but who cares.
+  document.getElementById("fromdevice_data").innerHTML += str;
 }
 
 
 // UNUSED RIGHT NOW//
 
-function onSerialClose(closeArg) {
-  log(kDebugFine, "ON CLOSE: " + JSON.stringify(closeArg));
+function onSerialDisconnect(disconnectArg) {
+  log(kDebugFine, "ON DISCONNECT: " + JSON.stringify(disconnectArg));
 }
 
 function onSerialFlush(flushArg) {
