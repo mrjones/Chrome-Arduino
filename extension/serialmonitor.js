@@ -139,11 +139,12 @@ function doSend() {
   input.value = "";
 
   log(kDebugFine, "SENDING " + data + " ON CONNECTION: " + connectionId_);
-  chrome.serial.write(connectionId_, stringToBinary(data), sendDone);
+  chrome.serial.send(connectionId_, stringToBinary(data), sendDone);
 }
 
 function sendDone(sendArg) {
-  log(kDebugFine, "SENT " + sendArg.bytesWritten + " BYTES ON CONN: " + connectionId_);
+  log(kDebugFine, "ON SEND:" + JSON.stringify(sendArg));
+  log(kDebugFine, "SENT " + sendArg.bytesSent + " BYTES ON CONN: " + connectionId_);
 }
 
 function stringToBinary(str) {
@@ -167,6 +168,7 @@ function binaryToString(buffer) {
 }
 
 function readHandler(readArg) {
+  log(kDebugFine, "ON READ:" + JSON.stringify(readArg));
   // TODO: check connection id
   var str = binaryToString(readArg.data);
   str.replace("\n", "<br/>");
