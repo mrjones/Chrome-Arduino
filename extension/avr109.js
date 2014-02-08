@@ -24,14 +24,16 @@ Avr109Board.prototype.connect = function(deviceName, doneCb) {
   this.kickBootloader_(deviceName, doneCb);
 };
 
-Avr109Board.prototype.writeFlash = function(boardAddress, data) {
-  if (this.state_ != Avr109Board.CONNECTED) {
-    return Status.Error("Not connected to board: " + this.state_);
+Avr109Board.prototype.writeFlash = function(boardAddress, data, doneCb) {
+  if (this.state_ != Avr109Board.State.CONNECTED) {
+    doneCb(Status.Error("Not connected to board: " + this.state_));
+  } else {
+    doneCb(Status.OK);
   }
 };
 
 Avr109Board.prototype.readFlash = function(boardAddress) {
-  if (this.state_ != Avr109Board.CONNECTED) {
+  if (this.state_ != Avr109Board.State.CONNECTED) {
     return Status.Error("Not connected to board: " + this.state_);
   }
 

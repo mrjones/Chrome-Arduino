@@ -61,7 +61,12 @@ describe("AVR109 board", function() {
   });
 
   it("can't write until connected", function() {
-    expect(board.writeFlash(0, [0x00, 0x01]).ok()).toBe(false);
+    runs(function() { board.writeFlash(0, [0x00, 0x01], justRecordStatus); } );
+
+    waitsFor(function() { return notified; },
+             "Callback should have been called", 1000);
+
+    runs(function() { expect(status.ok()).toBe(false); } );
   });
 
   it("can't read until connected", function() {
@@ -80,6 +85,35 @@ describe("AVR109 board", function() {
     runs(function() {
       expect(sawKickBitrate).toBe(true);
       expect(status.ok()).toBe(true);
+      expect(status.errorMessage()).toBeNull();
+    });
+  });
+
+  it("writes to flash", function() {
+    var testStatus;
+    var written;
+
+    runs(function() {
+      written = false;
+      board.connect("testDevice", function(status1) {
+        if (!status1) {
+          testStatus = status1;
+          return;
+        }
+
+        board.writeFlash(0, [0x00, 0x01, 0x02], function(status2) {
+          testStatus = status2;
+          written = true;
+        });
+      });
+    });
+
+    waitsFor(function() { return written; }, "Should have written.", 1000);
+
+    runs(function() {
+      expect(written).toBe(true);
+      expect(testStatus.ok()).toBe(true);
+      expect(testStatus.errorMessage()).toBeNull();
     });
   });
 
