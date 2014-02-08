@@ -15,7 +15,8 @@
         <button id="test_fetch">Test Fetch</button>
         <select id="protocol">
           <option value="stk500">STK500</option>
-          <option selected value="avr109">AVR109</option>
+          <option value="avr109">AVR109</option>
+          <option selected value="avr109_beta">AVR109 (Beta)</option>
         </select>
       </div>
       <div id="serialmonitor" class="section">
@@ -25,8 +26,12 @@
        </div>
      </div>
      <div id="status" class="section"></div>
+   <script src="status.js"></script>
+   <script src="clock.js"></script>
    <script src="logging.js"></script>
    <script src="hexparser.js"></script>
+   <script src="avr109.js"></script>
+   <script src="stk500.js"></script>
    <script src="uploader.js"></script>
    <script src="serialmonitor.js"></script>
   </body>

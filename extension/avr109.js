@@ -54,8 +54,8 @@ Avr109Board.prototype.readHandler_ = null;
 Avr109Board.MAGIC_BITRATE = 1200;
 
 Avr109Board.prototype.readDispatcher_ = function(readArg) {
-  log(kDebugFine, "RH: " + this.readHandler_);
-  log(kDebugFine, this);
+  log(kDebugFine, "Read: " + JSON.stringify(readArg));
+  log(kDebugFine, "Data: " + hexRep(binToHex(readArg.data)));
   if (this.readHandler_ != null) {
     this.readHandler_(readArg);
     return;
@@ -76,7 +76,7 @@ Avr109Board.prototype.kickBootloader_ = function(originalDeviceName, doneCb) {
       serial.disconnect(connectArg.connectionId, function(disconnectArg) {
         // TODO: validate disconnect arg
         board.waitForNewDevice_(
-          oldDevices, doneCb, board.clock_.nowMillis() + 500);
+          oldDevices, doneCb, board.clock_.nowMillis() + 10 * 1000);
       });
     });
   });
@@ -125,8 +125,11 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
       log(kDebugNormal, "Aha! Connecting to: " + appeared[0]);
       // TODO: really need to settimeout here?
       setTimeout(function() {
-        serial.connect(appeared[0], { bitrate: 57600 }, function(connectArg) { board.serialConnected_(connectArg, doneCb) }, 500);
-      });
+        serial.connect(
+          appeared[appeared.length - 1],
+          { bitrate: 57600 },
+          function(connectArg) { board.serialConnected_(connectArg, doneCb) })
+      }, 500);
     }
   });
 }
@@ -145,16 +148,15 @@ Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   this.startCheckSoftwareVersion_(doneCb);
 }
 
-Avr109Board.prototype.write_ = function(payload, doneCb) {
-  this.serial_.write(
-    this.connectionId_, hexToBin(payload), doneCb);
+Avr109Board.prototype.write_ = function(payload) {
+  this.serial_.send(
+    this.connectionId_, hexToBin(payload), function(writeArg) {
+      // TODO: veridy writeArg
+    });
 }
 
 Avr109Board.prototype.setReadHandler_ = function(handler) {
-  log(kDebugFine, "set read handler");
   this.readHandler_ = handler;
-  log(kDebugFine, "RH: " + this.readHandler_);
-  log(kDebugFine, this);
 };
 
 Avr109Board.prototype.startCheckSoftwareVersion_ = function(doneCb) {
@@ -163,9 +165,15 @@ Avr109Board.prototype.startCheckSoftwareVersion_ = function(doneCb) {
     board.finishCheckSoftwareVersion_(readArg, doneCb);
   });
 
-  this.serial_.send(this.connectionId_, [ AVR.SOFTWARE_VERSION ])
+  this.write_([ AVR.SOFTWARE_VERSION ]);
 }
 
 Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
-  doneCb(Status.OK);
+  var hexData = binToHex(readArg.data);
+
+  if (hexData.length == 2) {
+    doneCb(Status.OK);
+  }
+
+  // TODO: Deadline?
 };

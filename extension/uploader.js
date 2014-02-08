@@ -62,7 +62,7 @@ function readFromBuffer(connectionId, maxBytes, callback) {
 function uploadBlinkSketch(deviceName, protocol) {
   log(kDebugFine, "uploading blink sketch");
   var hexfile = 'http://linode.mrjon.es/blink.hex';
-  if (protocol == 'avr109') {
+  if (protocol == 'avr109' || protocol == 'avr109_beta') {
     hexfile = 'http://linode.mrjon.es/blink-micro.hex'
   }
 
@@ -93,12 +93,19 @@ var inSync_ = false;
 function uploadCompiledSketch(hexData, deviceName, protocol) {
   sketchData_ = hexData;
   inSync_ = false;
-  chrome.serial.onReceive.addListener(readToBuffer);
+  if (protocol != "avr109_beta") {
+    chrome.serial.onReceive.addListener(readToBuffer);
+  }
   if (protocol == "stk500") {
     chrome.serial.connect(deviceName, { bitrate: 57600 }, stkConnectDone);
   } else if (protocol == "avr109") {
     // actually want tocheck that board is leonardo / micro / whatever
     kickLeonardoBootloader(deviceName);
+  } else if (protocol == "avr109_beta") {
+    var board = new Avr109Board(chrome.serial);
+    board.connect(deviceName, function(status) {
+      log(kDebugNormal, "AVR connection status: " + status.toString());
+    });
   } else {
     log(kDebugError, "Unknown protocol: "  + protocol);
   }
