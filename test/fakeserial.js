@@ -3,6 +3,11 @@ function FakeSerial() {
 };
 
 FakeSerial.prototype.connect = function(portname, options, doneCb) {
+  if (!this.allowConnections_) {
+    this.execute_(doneCb, { connectionId: -1 } );
+    return;
+  }
+
   portname_ = portname;
   var args = { connectionId: this.connection_id_ };
   this.execute_(doneCb, args);
@@ -26,6 +31,11 @@ FakeSerial.prototype.portname_ = null;
 FakeSerial.prototype.connection_id_ = 123456;
 FakeSerial.prototype.errors_ = [];
 FakeSerial.prototype.readListeners_ = [];
+FakeSerial.prototype.allowConnections_ = true;
+
+FakeSerial.prototype.setAllowConnections = function(allow) {
+  this.allowConnections_ = allow;
+}
 
 FakeSerial.prototype.getPortname = function() {
   return portname_;
