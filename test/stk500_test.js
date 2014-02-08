@@ -1,5 +1,3 @@
-var chrome = { };
-
 describe("STK500 board", function() {
   var board;
   var fakeserial;
@@ -14,10 +12,9 @@ describe("STK500 board", function() {
 
   beforeEach(function() {
     fakeserial = new FakeSerial();
-    chrome.serial = fakeserial;
     notified = false;
 
-    board = new Stk500Board;
+    board = new Stk500Board(fakeserial);
   });
 
   it("can't write until connected", function() {
@@ -39,6 +36,16 @@ describe("STK500 board", function() {
 
     runs(function() {
       expect(status.ok()).toBe(true);
+
+      var signals = fakeserial.controlSignalHistory_;
+      expect(signals.length).toBe(2);
+      expect(signals[0].signals["dtr"]).toBe(false);
+      expect(signals[0].signals["rts"]).toBe(false);
+
+      expect(signals[1].signals["dtr"]).toBe(true);
+      expect(signals[1].signals["rts"]).toBe(true);
+
+      // TODO: mrjones assert on timestamps of control signals?
     });
   });
 
@@ -54,16 +61,6 @@ describe("STK500 board", function() {
 
     runs(function() {
       expect(status.ok()).toBe(false);
-
-      var signals = fakeserial.controlSignalHistory_;
-      expect(signals.length).toBe(2);
-      expect(signals[0].signals["dtr"]).toBe(false);
-      expect(signals[0].signals["rts"]).toBe(false);
-
-      expect(signals[1].signals["dtr"]).toBe(true);
-      expect(signals[1].signals["rts"]).toBe(true);
-
-      // TODO: mrjones assert on timestamps of control signals?
     });
   });
 });

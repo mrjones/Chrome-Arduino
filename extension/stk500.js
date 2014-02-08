@@ -5,7 +5,12 @@
 // WriteFlash
 
 // API
-function Stk500Board() { };
+function Stk500Board(serial) {
+  if (typeof(serial) === "undefined") {
+    console.log(kDebugError, "serial is undefined");
+  }
+  this.serial_ = serial;
+};
 
 Stk500Board.prototype.connect = function(deviceName, doneCb) {
   // TODO: Validate doneCb
@@ -18,7 +23,7 @@ Stk500Board.prototype.connect = function(deviceName, doneCb) {
   this.state_ = Stk500Board.State.CONNECTING;
 
   var fs = this;
-  chrome.serial.connect(deviceName, { bitrate: 57600 }, function(connectArg) {
+  this.serial_.connect(deviceName, { bitrate: 57600 }, function(connectArg) {
     fs.serialConnected_(connectArg, doneCb);
   });
 };
@@ -44,6 +49,7 @@ Stk500Board.State = {
   CONNECTED: "connected"
 };
 
+Stk500Board.prototype.serial_ = null;
 Stk500Board.prototype.state_ = Stk500Board.State.DISCONNECTED;
 Stk500Board.prototype.connectionId_ = -1;
 
@@ -61,14 +67,14 @@ Stk500Board.prototype.serialConnected_ = function(connectArg, doneCb) {
 
 Stk500Board.prototype.twiddleControlLines = function(doneCb) {
   var cid = this.connectionId_;
-
+  var serial = this.serial_;
   setTimeout(function() {
-    chrome.serial.setControlSignals(cid, {dtr: false, rts: false}, function(ok) {
+    serial.setControlSignals(cid, {dtr: false, rts: false}, function(ok) {
       if (!ok) {
         doneCb(Status.Error("Couldn't set dtr/rts low"));
         return;
       }
-      chrome.serial.setControlSignals(cid, {dtr: true, rts: true}, function(ok) {
+      serial.setControlSignals(cid, {dtr: true, rts: true}, function(ok) {
         if (!ok) {
           doneCb(Status.Error("Couldn't set dtr/rts high"));
           return;
