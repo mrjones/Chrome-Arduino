@@ -8,6 +8,10 @@ FakeSerial.prototype.connect = function(portname, options, doneCb) {
   this.execute_(doneCb, args);
 };
 
+FakeSerial.prototype.setControlSignals = function(connectionId, signals, doneCB) {
+  log(kDebugFine, "Setting control signals to " + JSON.stringify(signals) + " for connection " + connectionId);
+}
+
 FakeSerial.prototype.read = function(connectionId, n, doneCb) {
   if (connectionId != FakeSerial.connection_id_) {
     this.errors_.push(
