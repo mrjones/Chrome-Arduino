@@ -22,9 +22,9 @@ Stk500Board.prototype.connect = function(deviceName, doneCb) {
 
   this.state_ = Stk500Board.State.CONNECTING;
 
-  var fs = this;
+  var board = this;
   this.serial_.connect(deviceName, { bitrate: 57600 }, function(connectArg) {
-    fs.serialConnected_(connectArg, doneCb);
+    board.serialConnected_(connectArg, doneCb);
   });
 };
 
