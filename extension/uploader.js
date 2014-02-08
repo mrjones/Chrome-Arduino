@@ -2,10 +2,6 @@
 //
 // uploadCompiledSketch(parseHexfile(filename), serialportname) ??
 
-function consumeByteAnd(connectionId, callback) {
-  chrome.serial.read(connectionId, 1, callback);
-}
-
 var STK_OK = 0x10;
 var STK_INSYNC = 0x14;
 
@@ -25,9 +21,45 @@ var STK_SW_VER_MINOR = 0x82;
 
 ////
 
+var databuffer = { };
+
+function readToBuffer(readArg) {
+  log(kDebugFine, "READ TO BUFFER:" + JSON.stringify(readArg));
+  if (typeof(databuffer[readArg.connectionId]) == "undefined") {
+    log(kDebugFine, "Constructed buffer for: " + readArg.connectionId);
+    databuffer[readArg.connectionId] = [];
+  }
+
+  var hexData = binToHex(readArg.data);
+
+  log(kDebugFine, "Pushing " + hexData.length + " bytes onto buffer for: " + readArg.connectionId);
+  for (var i = 0; i < hexData.length; ++i) {
+    log(kDebugFine, i);
+    databuffer[readArg.connectionId].push(hexData[i]);
+  }
+  log(kDebugFine, "Buffer for " + readArg.connectionId + " now of size " + databuffer[readArg.connectionId].length);
+}
+
+function readFromBuffer(connectionId, maxBytes, callback) {
+  if (typeof(databuffer[connectionId]) == "undefined") {
+    log(kDebugFine, "No buffer for: " + connectionId);
+    callback({bytesRead: 0, data: []});
+    return;
+  }
+
+  var bytes = Math.min(maxBytes, databuffer[connectionId].length);
+  log(kDebugFine, "Reading " + bytes + " from buffer for " + connectionId);
+
+  var accum = [];
+  for (var i = 0; i < bytes; ++i) {
+    accum.push(databuffer[connectionId].pop());
+  }
+
+  callback({bytesRead: bytes, data: accum});
+}
 
 // TODO: board and prototocol should be separate variables
-function uploadBlinkSketch(serialPort, protocol) {
+function uploadBlinkSketch(deviceName, protocol) {
   log(kDebugFine, "uploading blink sketch");
   var hexfile = 'http://linode.mrjon.es/blink.hex';
   if (protocol == 'avr109') {
@@ -35,9 +67,9 @@ function uploadBlinkSketch(serialPort, protocol) {
   }
 
   fetchProgram(hexfile, function(programBytes) { 
-    log(kDebugFine, "Fetched program. Uploading to: " + serialPort);
+    log(kDebugFine, "Fetched program. Uploading to: " + deviceName);
     log(kDebugFine, "Protocol: " + protocol);
-    uploadCompiledSketch(programBytes, serialPort, protocol);
+    uploadCompiledSketch(programBytes, deviceName, protocol);
   });
 }
 
@@ -58,14 +90,15 @@ function fetchProgram(url, handler) {
 var sketchData_;
 var inSync_ = false;
 
-function uploadCompiledSketch(hexData, serialPortName, protocol) {
+function uploadCompiledSketch(hexData, deviceName, protocol) {
   sketchData_ = hexData;
   inSync_ = false;
+  chrome.serial.onReceive.addListener(readToBuffer);
   if (protocol == "stk500") {
-    chrome.serial.open(serialPortName, { bitrate: 57600 }, stkUploadOpenDone);
+    chrome.serial.connect(deviceName, { bitrate: 57600 }, stkConnectDone);
   } else if (protocol == "avr109") {
     // actually want tocheck that board is leonardo / micro / whatever
-    kickLeonardoBootloader(serialPortName);
+    kickLeonardoBootloader(deviceName);
   } else {
     log(kDebugError, "Unknown protocol: "  + protocol);
   }
@@ -166,23 +199,19 @@ function stkConsumeMessage(connectionId, payloadSize, callback) {
       if (!inSync_ && (reads % 3) == 0) {
         // Mega hack (temporary)
         log(kDebugFine, "Mega Hack: Writing: " + hexRep([STK_GET_SYNC, STK_CRC_EOP]));
-        chrome.serial.write(connectionId, hexToBin([STK_GET_SYNC, STK_CRC_EOP]), function() {
-            // Don't tight-loop waiting for the message.
-//            setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 10);
-            chrome.serial.read(connectionId, 1024, handleRead);
+        chrome.serial.send(connectionId, hexToBin([STK_GET_SYNC, STK_CRC_EOP]), function() {
+            readFromBuffer(connectionId, 1024, handleRead);
           });
       } else {
         // Don't tight-loop waiting for the message.
-//        setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 10);
-        chrome.serial.read(connectionId, 1024, handleRead);
+        readFromBuffer(connectionId, 1024, handleRead);
       }
 
     }
   };
 
   log(kDebugFine, "Scheduling a read in .1s");
-  setTimeout(function() { chrome.serial.read(connectionId, 1024, handleRead); }, 10);
-//  chrome.serial.read(connectionId, 1024, handleRead);
+  setTimeout(function() { readFromBuffer(connectionId, 1024, handleRead); }, 10);
 }
 
 function hexRep(intArray) {
@@ -214,25 +243,25 @@ function stkWriteThenRead(connectionId, outgoingMsg, responsePayloadSize, callba
   log(kDebugNormal, "[" + connectionId + "] Writing: " + hexRep(outgoingMsg));
   var outgoingBinary = hexToBin(outgoingMsg);
   // schedule a read in 100ms
-  chrome.serial.write(connectionId, outgoingBinary, function(writeArg) {
+  chrome.serial.send(connectionId, outgoingBinary, function(writeArg) {
       stkConsumeMessage(connectionId, responsePayloadSize, callback);
     });
 }
 
-function stkUploadOpenDone(openArg) {
-  if (typeof(openArg) == "undefined" ||
-      typeof(openArg.connectionId) == "undefined" ||
-      openArg.connectionId == -1) {
+function stkConnectDone(connectArg) {
+  if (typeof(connectArg) == "undefined" ||
+      typeof(connectArg.connectionId) == "undefined" ||
+      connectArg.connectionId == -1) {
     log(kDebugError, "Bad connectionId / Couldn't connect to board");
     return;
   }
 
-  log(kDebugFine, "Connected to board. ID: " + openArg.connectionId);
+  log(kDebugFine, "Connected to board. ID: " + connectArg.connectionId);
 
-  chrome.serial.read(openArg.connectionId, 1024, function(readArg) {
-      stkDrainedBytes(readArg, openArg.connectionId);
-    });
 
+  readFromBuffer(connectArg.connectionId, 1024, function(readArg) {
+    stkDrainedBytes(readArg, connectArg.connectionId);
+  });
 };
 
 function stkDtrSent(ok, connectionId) {
@@ -242,7 +271,7 @@ function stkDtrSent(ok, connectionId) {
   }
   log(kDebugFine, "DTR sent (low) real good");
 
-  chrome.serial.read(connectionId, 1024, function(readArg) {
+  readFromBuffer(connectionId, 1024, function(readArg) {
       stkDrainedAgain(readArg, connectionId);
     });
  
@@ -252,7 +281,7 @@ function stkDrainedAgain(readArg, connectionId) {
   log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
   if (readArg.bytesRead == 1024) {
     // keep draining
-    chrome.serial.read(connectionId, 1024, function(readArg) {
+    readFromBuffer(connectionId, 1024, function(readArg) {
         stkDrainedBytes(readArg, connectionId);
       });
   } else {
@@ -266,23 +295,23 @@ function stkDrainedBytes(readArg, connectionId) {
   log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
   if (readArg.bytesRead == 1024) {
     // keep draining
-    chrome.serial.read(connectionId, 1024, function(readArg) {
+    readFromBuffer(connectionId, 1024, function(readArg) {
         stkDrainedBytes(readArg, connectionId);
       });
   } else {
     log(kDebugFine, "About to set DTR low");
     
     setTimeout(function() {
-        chrome.serial.setControlSignals(connectionId, {dtr: false, rts: false}, function(ok) {
-            log(kDebugNormal, "sent dtr false, done: " + ok);
-            setTimeout(function() {
-                chrome.serial.setControlSignals(connectionId, {dtr: true, rts: true}, function(ok) {
-                    log(kDebugNormal, "sent dtr true, done: " + ok);
-                    setTimeout(function() { stkDtrSent(ok, connectionId); }, 500);
-                  });
-              }, 500);
+      chrome.serial.setControlSignals(connectionId, {dtr: false, rts: false}, function(ok) {
+        log(kDebugNormal, "sent dtr false, done: " + ok);
+        setTimeout(function() {
+          chrome.serial.setControlSignals(connectionId, {dtr: true, rts: true}, function(ok) {
+            log(kDebugNormal, "sent dtr true, done: " + ok);
+            setTimeout(function() { stkDtrSent(ok, connectionId); }, 500);
           });
-      }, 500);
+        }, 500);
+      });
+    }, 500);
   }
 }
 
@@ -386,7 +415,7 @@ function stkWaitForSync(connectionId) {
   var hex = [STK_GET_SYNC, STK_CRC_EOP];
   var data = hexToBin(hex);
   log(kDebugFine, "writing: " + hex + " -> " + data);
-  chrome.serial.write(connectionId, data, function(arg) { checkSync(connectionId, arg) } );
+  chrome.serial.send(connectionId, data, function(arg) { checkSync(connectionId, arg) } );
 }
 
 function hexToBin(hex) {
@@ -409,27 +438,32 @@ function binToHex(bin) {
 }
 
 function findMissingNeedlesInHaystack(needles, haystack) {
+  var haystack2 = [];
+  for (var i = 0; i < haystack.length; ++i) {
+    haystack2.push(haystack[i].path);
+  }
+
   var r = [];
   for (var i = 0; i < needles.length; ++i) {
-    if (haystack.indexOf(needles[i]) == -1) {
-      r.push(needles[i]);
+    if (haystack2.indexOf(needles[i].path) == -1) {
+      r.push(needles[i].path);
     }
   }
 
   return r;
 }
 
-function waitForNewPort(oldPorts, deadline) {
-  log(kDebugFine, "Waiting for new port...");
+function waitForNewDevice(oldDevices, deadline) {
+  log(kDebugFine, "Waiting for new device...");
   if (new Date().getTime() > deadline) {
     log(kDebugError, "Exceeded deadline");
     return;
   }
 
   var found = false;
-  chrome.serial.getPorts(function(newPorts) {
-    var appeared = findMissingNeedlesInHaystack(newPorts, oldPorts);
-    var disappeared = findMissingNeedlesInHaystack(oldPorts, newPorts);
+  chrome.serial.getDevices(function(newDevices) {
+    var appeared = findMissingNeedlesInHaystack(newDevices, oldDevices);
+    var disappeared = findMissingNeedlesInHaystack(oldDevices, newDevices);
  
     for (var i = 0; i < disappeared.length; ++i) {
       log(kDebugNormal, "Disappeared: " + disappeared[i]);
@@ -439,50 +473,48 @@ function waitForNewPort(oldPorts, deadline) {
     }
 
     if (appeared.length == 0) {
-      setTimeout(function() { waitForNewPort(newPorts, deadline); }, 100);
+      setTimeout(function() { waitForNewDevice(newDevices, deadline); }, 100);
     } else {
       log(kDebugNormal, "Aha! Connecting to: " + appeared[0]);
       setTimeout(function() {
-        chrome.serial.open(appeared[0], { bitrate: 57600 }, avrUploadOpenDone)}, 500);
+        chrome.serial.connect(appeared[0], { bitrate: 57600 }, avrConnectDone)}, 500);
     }
   });
 }
 
-function kickLeonardoBootloader(originalPortName) {
-  log(kDebugNormal, "kickLeonardoBootloader(" + originalPortName + ")");
+function kickLeonardoBootloader(originalDeviceName) {
+  log(kDebugNormal, "kickLeonardoBootloader(" + originalDeviceName + ")");
   var kMagicBaudRate = 1200;
-  var oldPorts = [];
-  chrome.serial.getPorts(function(portsArg) {
-    oldPorts = portsArg;
-    chrome.serial.open(originalPortName, { bitrate: kMagicBaudRate }, function(openArg) {
-      log(kDebugNormal, "Made sentinel connection to " + originalPortName);
-      chrome.serial.close(openArg.connectionId, function(disconnectArg) {
-        log(kDebugNormal, "Disconnected from " + originalPortName);
-        waitForNewPort(oldPorts, (new Date().getTime()) + 10000);
+  var oldDevices = [];
+  chrome.serial.getDevices(function(devicesArg) {
+    oldDevices = devicesArg;
+    chrome.serial.connect(originalDeviceName, { bitrate: kMagicBaudRate }, function(connectArg) {
+      log(kDebugNormal, "Made sentinel connection to " + originalDeviceName);
+      chrome.serial.disconnect(connectArg.connectionId, function(disconnectArg) {
+        log(kDebugNormal, "Disconnected from " + originalDeviceName);
+        waitForNewDevice(oldDevices, (new Date().getTime()) + 10000);
 //        setTimeout(function() {
-//          chrome.serial.open(originalPortName, { bitrate: 57600 }, avrUploadOpenDone);
+//          chrome.serial.connect(originalDeviceName, { bitrate: 57600 }, avrConnectDone);
 //        }, 300);
       });
     });
   });
-
 }
 
 
-function avrUploadOpenDone(openArg) {
-  if (typeof(openArg) == "undefined" ||
-      typeof(openArg.connectionId) == "undefined" ||
-      openArg.connectionId == -1) {
+function avrConnectDone(connectArg) {
+  if (typeof(connectArg) == "undefined" ||
+      typeof(connectArg.connectionId) == "undefined" ||
+      connectArg.connectionId == -1) {
     log(kDebugError, "(AVR) Bad connectionId / Couldn't connect to board");
     return;
   }
 
-  log(kDebugFine, "Connected to board. ID: " + openArg.connectionId);
+  log(kDebugFine, "Connected to board. ID: " + connectArg.connectionId);
 
-  chrome.serial.read(openArg.connectionId, 1024, function(readArg) {
-      avrDrainedBytes(readArg, openArg.connectionId);
-    });
-
+  readFromBuffer(connectArg.connectionId, 1024, function(readArg) {
+    avrDrainedBytes(readArg, connectArg.connectionId);
+  });
 };
 
 function avrWaitForBytes(connectionId, n, accum, deadline, callback) {
@@ -490,7 +522,6 @@ function avrWaitForBytes(connectionId, n, accum, deadline, callback) {
     log(kDebugError, "Deadline passed while waiting for " + n + " bytes");
     return;
   }
-//  log(kDebugFine, "Deadline: " + deadline + ", Now: " + (new Date().getTime()));
   log(kDebugNormal, "Waiting for " + n + " bytes");
 
   var handler = function(readArg) {
@@ -513,7 +544,7 @@ function avrWaitForBytes(connectionId, n, accum, deadline, callback) {
     }
   }
 
-  chrome.serial.read(connectionId, n, handler);
+  readFromBuffer(connectionId, n, handler);
 }
 
 var AVR = {
@@ -527,8 +558,8 @@ var AVR = {
 };
 
 function avrWriteThenRead(connectionId, writePayload, readSize, callback) {
-  log(kDebugFine, "Writing: " + hexRep(writePayload));
-  chrome.serial.write(connectionId, hexToBin(writePayload), function(writeARg) {
+  log(kDebugFine, "Writing: " + hexRep(writePayload) + " to " + connectionId);
+  chrome.serial.send(connectionId, hexToBin(writePayload), function(writeARg) {
     avrWaitForBytes(connectionId, readSize, [], (new Date().getTime()) + 1000, callback);
   });
 }
@@ -557,10 +588,11 @@ function avrProgrammingDone(connectionId) {
 }
 
 function avrDrainedAgain(readArg, connectionId) {
+  log(kDebugFine, "avrDrainedAgain({readarg}, " + connectionId);
   log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
   if (readArg.bytesRead == 1024) {
     // keep draining
-    chrome.serial.read(connectionId, 1024, function(readArg) {
+    readFromBuffer(connectionId, 1024, function(readArg) {
         avrDrainedBytes(readArg, connectionId);
       });
   } else {
@@ -571,29 +603,14 @@ function avrDrainedAgain(readArg, connectionId) {
 }
 
 function avrDrainedBytes(readArg, connectionId) {
-  log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES");
+  log(kDebugError, "DRAINED " + readArg.bytesRead + " BYTES on " + connectionId);
   if (readArg.bytesRead == 1024) {
     // keep draining
-    chrome.serial.read(connectionId, 1024, function(readArg) {
-        avrDrainedBytes(readArg, connectionId);
-      });
+    readFromBuffer(connectionId, 1024, function(readArg) {
+      avrDrainedBytes(readArg, connectionId);
+    });
   } else {
     setTimeout(function() { avrDtrSent(true, connectionId); }, 1000);
-    /*
-    log(kDebugFine, "About to set DTR low");
-    
-    setTimeout(function() {
-        chrome.serial.setControlSignals(connectionId, {dtr: false, rts: false}, function(ok) {
-            log(kDebugNormal, "sent dtr false, done: " + ok);
-            setTimeout(function() {
-                chrome.serial.setControlSignals(connectionId, {dtr: true, rts: true}, function(ok) {
-                    log(kDebugNormal, "sent dtr true, done: " + ok);
-                    setTimeout(function() { avrDtrSent(ok, connectionId); }, 500);
-                  });
-              }, 500);
-          });
-      }, 500);
-    */
   }
 }
 
@@ -602,9 +619,9 @@ function avrDtrSent(ok, connectionId) {
     log(kDebugError, "Couldn't send DTR");
     return;
   }
-  log(kDebugFine, "DTR sent (low) real good");
+  log(kDebugFine, "DTR sent (low) real good on connection: " + connectionId);
   
-  chrome.serial.read(connectionId, 1024, function(readArg) {
+  readFromBuffer(connectionId, 1024, function(readArg) {
     avrDrainedAgain(readArg, connectionId);
   }); 
 }
