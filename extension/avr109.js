@@ -172,6 +172,7 @@ Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
   var hexData = binToHex(readArg.data);
 
   if (hexData.length == 2) {
+    this.state_ = Avr109Board.State.CONNECTED;
     doneCb(Status.OK);
   }
 

@@ -3,6 +3,7 @@ describe("AVR109 board", function() {
   var fakeserial;
   var notified;
   var status;
+  var sawKickBitrate;
 
   var justRecordStatus = function(s) {
     console.log("justRecordStatus(" + JSON.stringify(s) + ")");
@@ -31,9 +32,30 @@ describe("AVR109 board", function() {
     return true;
   }
 
+  var disconnectListener = function(cid) {
+    // magic leonardo bitrate
+    sawKickBitrate = (fakeserial.latestBitrate_ == Avr109Board.MAGIC_BITRATE);
+    if (sawKickBitrate) {
+      setTimeout(function() {
+        var popped = fakeserial.deviceList_.pop();
+        setTimeout(function() {
+          fakeserial.deviceList_.push(popped);
+        });
+      }, 100);
+    }
+  };
+
   beforeEach(function() {
     fakeserial = new FakeSerial();
     notified = false;
+
+    // Enable simulation of kicking into the bootloader:
+    fakeserial.addDisconnectListener(disconnectListener);
+
+    // Enable checking of the software version for all tests
+    // TODO: factor out these constants
+    fakeserial.addMockReply(new ExactMatcher([0x56]),
+                            [0x31, 0x30]);
 
     board = new Avr109Board(fakeserial);
   });
@@ -47,27 +69,7 @@ describe("AVR109 board", function() {
   });
 
   it("connects", function() {
-    var sawKickBitrate = false;
-
-    var disconnectListener = function(cid) {
-      // magic leonardo bitrate
-      sawKickBitrate = (fakeserial.latestBitrate_ == Avr109Board.MAGIC_BITRATE);
-
-      if (sawKickBitrate) {
-        setTimeout(function() {
-          var popped = fakeserial.deviceList_.pop();
-          setTimeout(function() {
-            fakeserial.deviceList_.push(popped);
-          });
-        }, 100);
-      }
-    };
-
     runs(function() {
-      fakeserial.addDisconnectListener(disconnectListener);
-      // TODO: set a correct response
-      fakeserial.addMockReply(new ExactMatcher([0x56]),
-                              [0x00, 0x01]);
       board.connect("testDevice", justRecordStatus);
     });
 
