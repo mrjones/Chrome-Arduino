@@ -49,8 +49,20 @@ Avr109Board.prototype.serial_ = null;
 Avr109Board.prototype.state_ = Avr109Board.State.DISCONNECTED;
 Avr109Board.prototype.connectionId_ = -1;
 Avr109Board.prototype.clock_ = new RealClock;
+Avr109Board.prototype.readHandler_ = null;
 
 Avr109Board.MAGIC_BITRATE = 1200;
+
+Avr109Board.prototype.readDispatcher_ = function(readArg) {
+  log(kDebugFine, "RH: " + this.readHandler_);
+  log(kDebugFine, this);
+  if (this.readHandler_ != null) {
+    this.readHandler_(readArg);
+    return;
+  }
+
+  log(kDebugNormal, "No read handler for: " + JSON.stringify(readArg));
+}
 
 Avr109Board.prototype.kickBootloader_ = function(originalDeviceName, doneCb) {
   var oldDevices = [];
@@ -120,5 +132,40 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
 }
 
 Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
+  // TODO: test this?
+  if (typeof(connectArg) == "undefined" ||
+      typeof(connectArg.connectionId) == "undefined" ||
+      connectArg.connectionId == -1) {
+    doneCb(Status.Error("Couldn't connect to board"));
+    return;
+  }
+
+  this.connectionId_ = connectArg.connectionId;
+  this.serial_.onReceive.addListener(this.readDispatcher_.bind(this));
+  this.startCheckSoftwareVersion_(doneCb);
+}
+
+Avr109Board.prototype.write_ = function(payload, doneCb) {
+  this.serial_.write(
+    this.connectionId_, hexToBin(payload), doneCb);
+}
+
+Avr109Board.prototype.setReadHandler_ = function(handler) {
+  log(kDebugFine, "set read handler");
+  this.readHandler_ = handler;
+  log(kDebugFine, "RH: " + this.readHandler_);
+  log(kDebugFine, this);
+};
+
+Avr109Board.prototype.startCheckSoftwareVersion_ = function(doneCb) {
+  var board = this;
+  this.setReadHandler_(function(readArg) {
+    board.finishCheckSoftwareVersion_(readArg, doneCb);
+  });
+
+  this.serial_.send(this.connectionId_, [ AVR.SOFTWARE_VERSION ])
+}
+
+Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
   doneCb(Status.OK);
 };

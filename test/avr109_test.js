@@ -10,6 +10,27 @@ describe("AVR109 board", function() {
     status = s;
   }
 
+  var ExactMatcher = function(target) {
+    this.target_ = target;
+  }
+
+  ExactMatcher.prototype.matches = function(candidate) {
+    var hexCandidate = binToHex(candidate);
+    log(kDebugFine, "Target: " + hexRep(this.target_) + " vs. candidate: " +
+        hexRep(hexCandidate));
+    if (hexCandidate.length != this.target_.length) {
+      return false;
+    }
+
+    for (var i = 0; i < this.target_.length; ++i) {
+      if (this.target_[i] != hexCandidate[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   beforeEach(function() {
     fakeserial = new FakeSerial();
     notified = false;
@@ -44,6 +65,9 @@ describe("AVR109 board", function() {
 
     runs(function() {
       fakeserial.addDisconnectListener(disconnectListener);
+      // TODO: set a correct response
+      fakeserial.addMockReply(new ExactMatcher([0x56]),
+                              [0x00, 0x01]);
       board.connect("testDevice", justRecordStatus);
     });
 
