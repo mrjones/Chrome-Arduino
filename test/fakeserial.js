@@ -1,3 +1,5 @@
+
+
 function FakeSerial() {
   this.onReceive = new FakeSerialReadAdapter(this);
 };
@@ -13,8 +15,11 @@ FakeSerial.prototype.connect = function(portname, options, doneCb) {
   this.execute_(doneCb, args);
 };
 
-FakeSerial.prototype.setControlSignals = function(connectionId, signals, doneCB) {
-  log(kDebugFine, "Setting control signals to " + JSON.stringify(signals) + " for connection " + connectionId);
+FakeSerial.prototype.setControlSignals = function(connectionId, signals, doneCb) {
+  this.controlSignalHistory_.push(
+    { time: this.clock_.nowMillis(), signals: signals });
+
+  this.execute_(doneCb, true);
 }
 
 FakeSerial.prototype.read = function(connectionId, n, doneCb) {
@@ -32,6 +37,8 @@ FakeSerial.prototype.connection_id_ = 123456;
 FakeSerial.prototype.errors_ = [];
 FakeSerial.prototype.readListeners_ = [];
 FakeSerial.prototype.allowConnections_ = true;
+FakeSerial.prototype.clock_ = new RealClock();
+FakeSerial.prototype.controlSignalHistory_ = [];
 
 FakeSerial.prototype.setAllowConnections = function(allow) {
   this.allowConnections_ = allow;

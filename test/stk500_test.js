@@ -54,6 +54,16 @@ describe("STK500 board", function() {
 
     runs(function() {
       expect(status.ok()).toBe(false);
+
+      var signals = fakeserial.controlSignalHistory_;
+      expect(signals.length).toBe(2);
+      expect(signals[0].signals["dtr"]).toBe(false);
+      expect(signals[0].signals["rts"]).toBe(false);
+
+      expect(signals[1].signals["dtr"]).toBe(true);
+      expect(signals[1].signals["rts"]).toBe(true);
+
+      // TODO: mrjones assert on timestamps of control signals?
     });
   });
 });

@@ -56,6 +56,27 @@ Stk500Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   }
 
   this.connectionId_ = connectArg.connectionId;
-  doneCb(Status.OK);
+  this.twiddleControlLines(doneCb);
+}
+
+Stk500Board.prototype.twiddleControlLines = function(doneCb) {
+  var cid = this.connectionId_;
+
+  setTimeout(function() {
+    chrome.serial.setControlSignals(cid, {dtr: false, rts: false}, function(ok) {
+      if (!ok) {
+        doneCb(Status.Error("Couldn't set dtr/rts low"));
+        return;
+      }
+      chrome.serial.setControlSignals(cid, {dtr: true, rts: true}, function(ok) {
+        if (!ok) {
+          doneCb(Status.Error("Couldn't set dtr/rts high"));
+          return;
+        }
+        // TODO: next setp
+        doneCb(Status.OK);
+      });
+    });
+  });
 }
 
