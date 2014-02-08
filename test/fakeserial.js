@@ -1,10 +1,11 @@
 function FakeSerial() {
-
+  this.onReceive = new FakeSerialReadAdapter(this);
 };
 
 FakeSerial.prototype.connect = function(portname, options, doneCb) {
   portname_ = portname;
-  this.execute_(doneCb, { connectionId: FakeSerial.connection_id_ });
+  var args = { connectionId: this.connection_id_ };
+  this.execute_(doneCb, args);
 };
 
 FakeSerial.prototype.read = function(connectionId, n, doneCb) {
@@ -15,24 +16,29 @@ FakeSerial.prototype.read = function(connectionId, n, doneCb) {
         connectionId + "'");
     return;
   }
-
-//  this.execute(doneCb, 
-};
-
-FakeSerial.prototype.onReceive = {
-  addListener: function(l) {
-    console.log("Added listener");
-  }
 };
 
 FakeSerial.prototype.portname_ = null;
 FakeSerial.prototype.connection_id_ = 123456;
 FakeSerial.prototype.errors_ = [];
+FakeSerial.prototype.readListeners_ = [];
 
 FakeSerial.prototype.getPortname = function() {
   return portname_;
 };
 
 FakeSerial.prototype.execute_ = function(callback, args) {
+//  log(kDebugFine, "Executing callback with args: " + JSON.stringify(args));
   callback(args);
 };
+
+function FakeSerialReadAdapter(fakeSerial) {
+  this.fs_ = fakeSerial;
+}
+
+FakeSerialReadAdapter.prototype.addListener = function(listener) {
+  this.fs_.readListeners_.push(listener);
+  console.log("Num listeners: " + this.fs_.readListeners_.length);
+}
+
+FakeSerialReadAdapter.prototype.fs_ = null;
