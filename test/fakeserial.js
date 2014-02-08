@@ -2,7 +2,7 @@ function FakeSerial() {
 
 };
 
-FakeSerial.prototype.open = function(portname, options, doneCb) {
+FakeSerial.prototype.connect = function(portname, options, doneCb) {
   portname_ = portname;
   this.execute_(doneCb, { connectionId: FakeSerial.connection_id_ });
 };
@@ -15,8 +15,14 @@ FakeSerial.prototype.read = function(connectionId, n, doneCb) {
         connectionId + "'");
     return;
   }
-  console.log("FakeSerial read of " + n + " bytes on connection " + connectionId);
-  // TODO
+
+//  this.execute(doneCb, 
+};
+
+FakeSerial.prototype.onReceive = {
+  addListener: function(l) {
+    console.log("Added listener");
+  }
 };
 
 FakeSerial.prototype.portname_ = null;
