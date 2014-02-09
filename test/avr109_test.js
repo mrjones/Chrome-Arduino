@@ -5,6 +5,8 @@ describe("AVR109 board", function() {
   var status;
   var sawKickBitrate;
 
+  var PAGE_SIZE = 8;
+
   var justRecordStatus = function(s) {
     console.log("justRecordStatus(" + JSON.stringify(s) + ")");
     notified = true;
@@ -46,6 +48,25 @@ describe("AVR109 board", function() {
   };
 
   beforeEach(function() {
+    this.addMatchers({
+      toBeOk: function() {
+        this.message = function() {
+          return "Status not OK. Message: '" + 
+            this.actual.errorMessage() + "'";
+        }
+
+        return this.actual.ok() &&
+          this.actual.errorMessage() == null;
+      },
+
+      toBeError: function() {
+        this.message = function() {
+          return "Expected status to be error, but was OK.";
+        };
+        return !this.actual.ok();
+      },
+    });
+
     fakeserial = new FakeSerial();
     notified = false;
 
@@ -57,20 +78,27 @@ describe("AVR109 board", function() {
     fakeserial.addMockReply(new ExactMatcher([0x56]),
                             [0x31, 0x30]);
 
-    board = new Avr109Board(fakeserial);
+    var r = NewAvr109Board(fakeserial, PAGE_SIZE);
+    expect(r.status).toBeOk();
+    board = r.board;
   });
 
   it("can't write until connected", function() {
-    runs(function() { board.writeFlash(0, [0x00, 0x01], justRecordStatus); } );
+    runs(function() {
+      board.writeFlash(
+        0,
+        [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07],
+        justRecordStatus);
+    });
 
     waitsFor(function() { return notified; },
              "Callback should have been called", 1000);
 
-    runs(function() { expect(status.ok()).toBe(false); } );
+    runs(function() { expect(status).toBeError(); } );
   });
 
   it("can't read until connected", function() {
-    expect(board.readFlash(0).ok()).toBe(false);
+    expect(board.readFlash(0)).toBeError();
   });
 
   it("connects", function() {
@@ -84,8 +112,7 @@ describe("AVR109 board", function() {
 
     runs(function() {
       expect(sawKickBitrate).toBe(true);
-      expect(status.ok()).toBe(true);
-      expect(status.errorMessage()).toBeNull();
+      expect(status).toBeOk();
     });
   });
 
@@ -101,7 +128,7 @@ describe("AVR109 board", function() {
           return;
         }
 
-        board.writeFlash(0, [0x00, 0x01, 0x02], function(status2) {
+        board.writeFlash(0, [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07], function(status2) {
           testStatus = status2;
           written = true;
         });
@@ -112,8 +139,7 @@ describe("AVR109 board", function() {
 
     runs(function() {
       expect(written).toBe(true);
-      expect(testStatus.ok()).toBe(true);
-      expect(testStatus.errorMessage()).toBeNull();
+      expect(testStatus).toBeOk();
     });
   });
 
@@ -128,7 +154,7 @@ describe("AVR109 board", function() {
     }, "Callback should have been called.", 100);
 
     runs(function() {
-      expect(status.ok()).toBe(false);
+      expect(status).toBeError();
     });
   });
 });

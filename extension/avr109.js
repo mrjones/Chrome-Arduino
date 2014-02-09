@@ -5,11 +5,22 @@
 // WriteFlash
 
 // API
-function Avr109Board(serial) {
+function NewAvr109Board(serial, pageSize) {
   if (typeof(serial) === "undefined") {
-    console.log(kDebugError, "serial is undefined");
+    return { status: Status.Error("serial is undefined") }
   }
+
+  if (typeof(pageSize) === "undefined") {
+    return { status: Status.Error("pageSize is undefined") }
+  }
+
+  return { status: Status.OK,
+           board: new Avr109Board(serial, pageSize) };
+};
+
+function Avr109Board(serial, pageSize) {
   this.serial_ = serial;
+  this.pageSize_ = pageSize;
 };
 
 Avr109Board.prototype.connect = function(deviceName, doneCb) {
@@ -26,10 +37,25 @@ Avr109Board.prototype.connect = function(deviceName, doneCb) {
 
 Avr109Board.prototype.writeFlash = function(boardAddress, data, doneCb) {
   if (this.state_ != Avr109Board.State.CONNECTED) {
-    doneCb(Status.Error("Not connected to board: " + this.state_));
-  } else {
-    doneCb(Status.OK);
+    return doneCb(Status.Error("Not connected to board: " + this.state_));
+  };
+
+  if (boardAddress % this.pageSize_ != 0) {
+    return doneCb(Status.Error(
+      "boardAddress must be alligned to page size of " + this.pageSize_
+        + " (" + boardAddress + " % " + this.pageSize_ + " == "
+        + (boardAddress % this.pageSize_) + ")"));
   }
+
+  if (data.length % this.pageSize_ != 0) {
+    return doneCb(Status.Error(
+      "data size must be alligned to page size of " + this.pageSize_
+        + " (" + data.length + " % " + this.pageSize_ + " == "
+        + (data.length % this.pageSize_) + ")"));
+
+  }
+
+  doneCb(Status.OK);
 };
 
 Avr109Board.prototype.readFlash = function(boardAddress) {
@@ -47,6 +73,7 @@ Avr109Board.State = {
   CONNECTED: "connected"
 };
 
+Avr109Board.prototype.pageSize_ = -1;
 Avr109Board.prototype.serial_ = null;
 Avr109Board.prototype.state_ = Avr109Board.State.DISCONNECTED;
 Avr109Board.prototype.connectionId_ = -1;
