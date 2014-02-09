@@ -562,6 +562,7 @@ var AVR = {
   WRITE: 0x42,
   TYPE_FLASH: 0x46,
   EXIT_BOOTLOADER: 0x45,
+  CR: 0x0D,
 };
 
 function avrWriteThenRead(connectionId, writePayload, readSize, callback) {

@@ -23,19 +23,18 @@ FakeSerial.prototype.send = function(connectionId, payload, doneCb) {
     return;
   }
 
-  for (var m = 0; m < this.mockReplies_.length; ++m) {
-    if (this.mockReplies_[m].matcher.matches(payload)) {
+  for (var h = 0; h < this.hooks_.length; ++h) {
+    if (this.hooks_[h].matcher.matches(payload)) {
+      var reply = this.hooks_[h].handler.handle(payload);
       for (var l = 0; l < this.readListeners_.length; ++l) {
-        this.readListeners_[l](
-          { connectionId: connectionId,
-            data: this.mockReplies_[m].reply });
+        this.readListeners_[l]({ connectionId: connectionId, data: reply });
       }
       return;
     }
   }
 
   // TODO: push this on errors_
-  log(kDebugError, "No matcher for: " + payload);
+  log(kDebugError, "No matcher for: " + hexRep(binToHex(payload)));
 };
 
 FakeSerial.prototype.disconnect = function(connectionId, doneCb) {
@@ -90,10 +89,12 @@ FakeSerial.prototype.deviceList_ = [ "testDevice" ];
 FakeSerial.prototype.latestBitrate_ = -1;
 FakeSerial.prototype.connected_ = false;
 FakeSerial.prototype.disconnectListeners_ = [];
-FakeSerial.prototype.mockReplies_ = [];
+FakeSerial.prototype.hooks_ = [];
 
-FakeSerial.prototype.addMockReply = function(matcher, reply) {
-  this.mockReplies_.push({matcher: matcher, reply: reply});
+FakeSerial.prototype.addHook = function(matcher, handler) {
+  var o = {matcher: matcher, handler: handler};
+  log(kDebugFine, "addHook: " + JSON.stringify(o));
+  this.hooks_.push(o);
 };
 
 FakeSerial.prototype.addDisconnectListener = function(l) {

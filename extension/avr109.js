@@ -52,10 +52,21 @@ Avr109Board.prototype.writeFlash = function(boardAddress, data, doneCb) {
       "data size must be alligned to page size of " + this.pageSize_
         + " (" + data.length + " % " + this.pageSize_ + " == "
         + (data.length % this.pageSize_) + ")"));
-
   }
 
-  doneCb(Status.OK);
+
+  var board = this;
+  this.writeAndGetReply_(
+    [AVR.ENTER_PROGRAM_MODE],
+    function(response) {
+      var hexResponse = binToHex(response.data);
+      if (hexResponse.length == 1 && hexResponse[0] == 0x0D) {
+        board.beginProgramming_(boardAddress, data, doneCb)
+      } else {
+        return doneCb(Status.Error(
+          "Error entering program mode: " + hexRep(response)));
+      }
+    });
 };
 
 Avr109Board.prototype.readFlash = function(boardAddress) {
@@ -177,6 +188,12 @@ Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   this.startCheckSoftwareVersion_(doneCb);
 }
 
+Avr109Board.prototype.writeAndGetReply_ = function(payload, handler) {
+  
+  this.setReadHandler_(handler);
+  this.write_(payload);
+};
+
 Avr109Board.prototype.write_ = function(payload) {
   this.serial_.send(
     this.connectionId_, hexToBin(payload), function(writeArg) {
@@ -184,22 +201,23 @@ Avr109Board.prototype.write_ = function(payload) {
     });
 }
 
+
 Avr109Board.prototype.setReadHandler_ = function(handler) {
   this.readHandler_ = handler;
 };
 
 Avr109Board.prototype.startCheckSoftwareVersion_ = function(doneCb) {
   var board = this;
-  this.setReadHandler_(function(readArg) {
-    board.finishCheckSoftwareVersion_(readArg, doneCb);
-  });
-
-  this.write_([ AVR.SOFTWARE_VERSION ]);
+  this.writeAndGetReply_(
+    [ AVR.SOFTWARE_VERSION ],
+    function(readArg) {
+      board.finishCheckSoftwareVersion_(readArg, doneCb);
+    });
 }
 
 Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
   var hexData = binToHex(readArg.data);
-
+  // TODO: actuall examine response
   if (hexData.length == 2) {
     this.state_ = Avr109Board.State.CONNECTED;
     doneCb(Status.OK);
@@ -207,3 +225,53 @@ Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
 
   // TODO: Deadline?
 };
+
+
+Avr109Board.prototype.beginProgramming_ = function(boardAddress, data, doneCb) {
+  log(kDebugFine, "beginProgramming(" + boardAddress + ", <data:" + data.length
+      + ">, <doneCB>)");
+  var board = this;
+  var addressBytes = storeAsTwoBytes(boardAddress);
+  this.writeAndGetReply_(
+    // TODO: endianness
+    [AVR.SET_ADDRESS, addressBytes[1], addressBytes[0]],
+    function(readArg) {
+      var hexData = binToHex(readArg.data);
+      if (hexData.length == 1 && hexData[0] == 0x0D) {
+        board.writePage_(0, data, doneCb);
+      } else {
+        return doneCb(Status.Error("Error setting address."));
+      }
+    });
+}
+
+Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
+  log(kDebugFine, "writePage(" + pageNo + ", <data:" + data.length
+      + ">, <doneCB>)");
+  var board = this;
+  var pageSize = this.pageSize_;
+
+  var payload = data.slice(pageNo * this.pageSize_,
+                           (pageNo + 1) * this.pageSize_);
+
+  var sizeBytes = storeAsTwoBytes(data.length);
+
+  // TODO: endianness
+  var writeMessage = [AVR.WRITE, sizeBytes[0], sizeBytes[1], AVR.TYPE_FLASH];
+  writeMessage = writeMessage.concat(payload);
+
+  this.writeAndGetReply_(
+    writeMessage,
+    function(readArg) {
+      var hexData = binToHex(readArg.data);
+      if (hexData.length == 1 && hexData[0] == 0x0D) {
+        if (pageSize * (pageNo + 1) >= data.length) {
+          return doneCb(Status.OK);
+        }
+        board.writePage(pageNo + 1, data, doneCb);
+      } else {
+        return doneCb(Status.Error("Error writing page " + pageNo + ": " +
+                                   hexRep(hexData)));
+      }
+    });
+}

@@ -1,9 +1,26 @@
+var MemBlock = function(size) {
+  this.size_ = size;
+  this.cursor_ = -1;
+  this.data_ = new Array(size);
+}
+
+MemBlock.prototype.seek = function(address) {
+  this.cursor_ = address;
+}
+
+MemBlock.prototype.write = function(data) {
+  for (var i = 0; i < data.length; ++i) {
+    this.data_[this.cursor_++] = data[i];
+  }
+}
+
 describe("AVR109 board", function() {
   var board;
   var fakeserial;
   var notified;
   var status;
   var sawKickBitrate;
+  var memBlock;
 
   var PAGE_SIZE = 8;
 
@@ -13,10 +30,17 @@ describe("AVR109 board", function() {
     status = s;
   }
 
+  var ExactReply = function(reply) {
+    this.reply_ = reply;
+  }
+  ExactReply.prototype.handle = function(unusedPayload) {
+    return this.reply_;
+  }
+
+
   var ExactMatcher = function(target) {
     this.target_ = target;
   }
-
   ExactMatcher.prototype.matches = function(candidate) {
     var hexCandidate = binToHex(candidate);
     log(kDebugFine, "Target: " + hexRep(this.target_) + " vs. candidate: " +
@@ -33,6 +57,27 @@ describe("AVR109 board", function() {
 
     return true;
   }
+
+  var PrefixMatcher = function(target) {
+    this.target_ = target;
+  }
+  PrefixMatcher.prototype.matches = function(candidate) {
+    var hexCandidate = binToHex(candidate);
+    log(kDebugFine, "Prefix target: " + hexRep(this.target_)
+        + " vs. candidate: " + hexRep(hexCandidate));
+
+    if (hexCandidate.length <= this.target_.length) {
+      return false;
+    }
+
+    for (var i = 0; i < this.target_.length; ++i) {
+      if (this.target_[i] != hexCandidate[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  };
 
   var disconnectListener = function(cid) {
     // magic leonardo bitrate
@@ -67,6 +112,7 @@ describe("AVR109 board", function() {
       },
     });
 
+    
     fakeserial = new FakeSerial();
     notified = false;
 
@@ -75,8 +121,46 @@ describe("AVR109 board", function() {
 
     // Enable checking of the software version for all tests
     // TODO: factor out these constants
-    fakeserial.addMockReply(new ExactMatcher([0x56]),
-                            [0x31, 0x30]);
+    fakeserial.addHook(new ExactMatcher([AVR.SOFTWARE_VERSION]),
+                       new ExactReply([0x31, AVR.CR]));
+
+    fakeserial.addHook(new ExactMatcher([AVR.ENTER_PROGRAM_MODE]),
+                       new ExactReply([AVR.CR]));
+
+    fakeserial.addHook(new PrefixMatcher([AVR.SET_ADDRESS]),
+                       { handle: function(payload) {
+                         var hexData = binToHex(payload);
+                         if (hexData.length != 3) {
+                           log(kDebugError, "Malformed SET_ADDRESS");
+                         } else {
+                           var address = hexData[2] + (hexData[1] << 16);
+                           memBlock.seek(address);
+                           return [AVR.CR];
+                         }
+                       }});
+
+    fakeserial.addHook(new PrefixMatcher([AVR.WRITE]),
+                       { handle: function(payload) {
+                         var hexData = binToHex(payload);
+                         if (hexData.length < 4) {
+                           log(kDebugError, "Malformed WRITE (too short)");
+                         } else if (hexData[3] != 0x46) { // F
+                           log(kDebugError, "Malformed WRITE (no 'F')");
+                         } else {
+                           var length = hexData[2] + (hexData[1] << 16);
+                           var payload = hexData.slice(4);
+                           if (payload.length != length) {
+                             log(kDebugError, "Malformed WRITE (bad length. " +
+                                "Declared: " + length + ", Actual: " +
+                                payload.length + ")");
+                           } else {
+                             memBlock.write(payload);
+                             return [AVR.CR];
+                           }
+                         }
+                       }});
+
+    memBlock = new MemBlock(PAGE_SIZE * 10);
 
     var r = NewAvr109Board(fakeserial, PAGE_SIZE);
     expect(r.status).toBeOk();
