@@ -90,6 +90,13 @@ function fetchProgram(url, handler) {
 var sketchData_;
 var inSync_ = false;
 
+function pad(data, pageSize) {
+  while (data.length % pageSize != 0) {
+    data.push(0);
+  }
+  return data;
+}
+
 function uploadCompiledSketch(hexData, deviceName, protocol) {
   sketchData_ = hexData;
   inSync_ = false;
@@ -102,9 +109,21 @@ function uploadCompiledSketch(hexData, deviceName, protocol) {
     // actually want tocheck that board is leonardo / micro / whatever
     kickLeonardoBootloader(deviceName);
   } else if (protocol == "avr109_beta") {
-    var board = new Avr109Board(chrome.serial);
+    var boardObj = NewAvr109Board(chrome.serial, 128);
+    if (!boardObj.status.ok()) {
+      log(kDebugError, "Couldn't create AVR109 Board: " + boardObj.status.toString());
+      return;
+    }
+    var board = boardObj.board;
     board.connect(deviceName, function(status) {
-      log(kDebugNormal, "AVR connection status: " + status.toString());
+      if (status.ok()) {
+        board.writeFlash(0, pad(hexData, 128), function(status) {
+          log(kDebugNormal, "AVR programming status: " + status.toString());
+
+        });
+      } else {
+        log(kDebugNormal, "AVR connection error: " + status.toString());
+      }
     });
   } else {
     log(kDebugError, "Unknown protocol: "  + protocol);

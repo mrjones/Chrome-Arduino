@@ -14,6 +14,14 @@ MemBlock.prototype.write = function(data) {
   }
 }
 
+var genData = function(length) {
+  var a = [];
+  for (var i = 0; i < length; ++i) {
+    a.push(i);
+  }
+  return a;
+}
+
 describe("AVR109 board", function() {
   var board;
   var fakeserial;
@@ -171,7 +179,7 @@ describe("AVR109 board", function() {
     runs(function() {
       board.writeFlash(
         0,
-        [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07],
+        genData(8),
         justRecordStatus);
     });
 
@@ -212,7 +220,7 @@ describe("AVR109 board", function() {
           return;
         }
 
-        board.writeFlash(0, [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07], function(status2) {
+        board.writeFlash(0, genData(16), function(status2) {
           testStatus = status2;
           written = true;
         });
@@ -224,6 +232,10 @@ describe("AVR109 board", function() {
     runs(function() {
       expect(written).toBe(true);
       expect(testStatus).toBeOk();
+
+      for (var i = 0; i < 16; ++i) {
+        expect(memBlock.data_[i]).toBe(i);
+      }
     });
   });
 

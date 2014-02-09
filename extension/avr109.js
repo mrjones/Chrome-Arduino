@@ -254,7 +254,7 @@ Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
   var payload = data.slice(pageNo * this.pageSize_,
                            (pageNo + 1) * this.pageSize_);
 
-  var sizeBytes = storeAsTwoBytes(data.length);
+  var sizeBytes = storeAsTwoBytes(this.pageSize_);
 
   // TODO: endianness
   var writeMessage = [AVR.WRITE, sizeBytes[0], sizeBytes[1], AVR.TYPE_FLASH];
@@ -268,7 +268,7 @@ Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
         if (pageSize * (pageNo + 1) >= data.length) {
           return doneCb(Status.OK);
         }
-        board.writePage(pageNo + 1, data, doneCb);
+        board.writePage_(pageNo + 1, data, doneCb);
       } else {
         return doneCb(Status.Error("Error writing page " + pageNo + ": " +
                                    hexRep(hexData)));
