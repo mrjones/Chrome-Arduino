@@ -23,6 +23,14 @@ var STK_SW_VER_MINOR = 0x82;
 
 var databuffer = { };
 
+var globalDispatcher = new SerialDispatcher();
+if (chrome.serial) {
+  // Don't want to do this in unit tests
+  // TODO: make this a little more elegant?
+  chrome.serial.onReceive.addListener(
+    globalDispatcher.dispatch.bind(globalDispatcher));
+}
+
 function readToBuffer(readArg) {
   log(kDebugFine, "READ TO BUFFER:" + JSON.stringify(readArg));
   if (typeof(databuffer[readArg.connectionId]) == "undefined") {
@@ -109,7 +117,7 @@ function uploadCompiledSketch(hexData, deviceName, protocol) {
     // actually want tocheck that board is leonardo / micro / whatever
     kickLeonardoBootloader(deviceName);
   } else if (protocol == "avr109_beta") {
-    var boardObj = NewAvr109Board(chrome.serial, 128);
+    var boardObj = NewAvr109Board(chrome.serial, 128, globalDispatcher);
     if (!boardObj.status.ok()) {
       log(kDebugError, "Couldn't create AVR109 Board: " + boardObj.status.toString());
       return;

@@ -5,7 +5,7 @@
 // WriteFlash
 
 // API
-function NewAvr109Board(serial, pageSize) {
+function NewAvr109Board(serial, pageSize, dispatcher) {
   if (typeof(serial) === "undefined") {
     return { status: Status.Error("serial is undefined") }
   }
@@ -14,13 +14,18 @@ function NewAvr109Board(serial, pageSize) {
     return { status: Status.Error("pageSize is undefined") }
   }
 
+  if (typeof(dispatcher) === "undefined") {
+    return { status: Status.Error("dispatcher is undefined") }
+  }
+
   return { status: Status.OK,
-           board: new Avr109Board(serial, pageSize) };
+           board: new Avr109Board(serial, pageSize, dispatcher) };
 };
 
-function Avr109Board(serial, pageSize) {
+function Avr109Board(serial, pageSize, dispatcher) {
   this.serial_ = serial;
   this.pageSize_ = pageSize;
+  this.globalDispatcher_ = dispatcher;
 };
 
 Avr109Board.prototype.connect = function(deviceName, doneCb) {
@@ -88,6 +93,7 @@ Avr109Board.State = {
   CONNECTED: "connected"
 };
 
+Avr109Board.prototype.globalDispatcher_ = null;
 Avr109Board.prototype.pageSize_ = -1;
 Avr109Board.prototype.serial_ = null;
 Avr109Board.prototype.state_ = Avr109Board.State.DISCONNECTED;
@@ -193,7 +199,11 @@ Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   }
 
   this.connectionId_ = connectArg.connectionId;
-  this.serial_.onReceive.addListener(this.readDispatcher_.bind(this));
+//  this.serial_.onReceive.addListener(this.readDispatcher_.bind(this));
+  // TODO: be more careful about removing this listener
+  this.globalDispatcher_.addListener(
+    this.connectionId_,
+    this.readDispatcher_.bind(this));
   this.startCheckSoftwareVersion_(doneCb);
 }
 
@@ -314,6 +324,8 @@ Avr109Board.prototype.exitBootloader_ = function(doneCb) {
     function(readArg) {
       var hexData = binToHex(readArg.data);
       if (hexData.length == 1 && hexData[0] == AVR.CR) {
+        // TODO: add a "disconnect" method, and call it everywhere
+        this.globalDispatcher_.removeListener(this.connectionId_);
         doneCb(Status.OK);
       } else {
         doneCb(Status.Error("Error leaving bootloader: " + hexRep(hexData)));

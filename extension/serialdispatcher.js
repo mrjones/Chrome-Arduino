@@ -6,7 +6,6 @@ SerialDispatcher.prototype.listeners_ = [];
 
 SerialDispatcher.prototype.dispatch = function(readArg) {
   for (var i = 0; i < this.listeners_.length; ++i) {
-    console.log("Dispatching: " + i);
     this.listeners_[i].listener(readArg);
   }
 }

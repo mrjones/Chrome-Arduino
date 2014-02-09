@@ -94,7 +94,10 @@ describe("AVR109 board", function() {
       new ExactMatcher([AVR.EXIT_BOOTLOADER]),
       new ExactReply([AVR.CR]));
 
-    var r = NewAvr109Board(fakeserial, PAGE_SIZE);
+    var globalDispatcher = new SerialDispatcher();
+    fakeserial.onReceive.addListener(
+      globalDispatcher.dispatch.bind(globalDispatcher));
+    var r = NewAvr109Board(fakeserial, PAGE_SIZE, globalDispatcher);
     expect(r.status).toBeOk();
     board = r.board;
   });
