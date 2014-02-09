@@ -266,7 +266,7 @@ Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
       var hexData = binToHex(readArg.data);
       if (hexData.length == 1 && hexData[0] == 0x0D) {
         if (pageSize * (pageNo + 1) >= data.length) {
-          return doneCb(Status.OK);
+          return board.doneProgramming_(doneCb);
         }
         board.writePage_(pageNo + 1, data, doneCb);
       } else {
@@ -275,3 +275,16 @@ Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
       }
     });
 }
+
+Avr109Board.prototype.doneProgramming_ = function(doneCb) {
+  this.writeAndGetReply_(
+    [AVR.LEAVE_PROGRAM_MODE],
+    function(readArg) {
+      var hexData = binToHex(readArg.data);
+      if (hexData.length == 1 && hexData[0] == AVR.CR) {
+        doneCb(Status.OK);
+      } else {
+        doneCb(Status.Error("Error leaving progam mode: " + hexRep(hexData)));
+      }
+    });
+};

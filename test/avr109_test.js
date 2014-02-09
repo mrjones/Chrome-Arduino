@@ -168,6 +168,9 @@ describe("AVR109 board", function() {
                          }
                        }});
 
+    fakeserial.addHook(new ExactMatcher([AVR.LEAVE_PROGRAM_MODE]),
+                       new ExactReply([AVR.CR]));
+
     memBlock = new MemBlock(PAGE_SIZE * 10);
 
     var r = NewAvr109Board(fakeserial, PAGE_SIZE);
