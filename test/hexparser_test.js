@@ -1,5 +1,5 @@
 describe("HexParser", function() {
-  it("parses simple valid file", function() {
+  it("handles simple valid file", function() {
     var input =
       ":100000000C9461000C947E000C947E000C947E0095 \n" +
       ":00000001FF \n\n";
@@ -8,16 +8,6 @@ describe("HexParser", function() {
       [ 0x0c, 0x94, 0x61, 0x00, 0x0C, 0x94, 0x7E, 0x00, 0x0C, 0x94, 0x7E, 0x00, 0x0C, 0x94, 0x7E, 0x00];
 
     expect(ParseHexFile(input)).toEqual(expectedOutput);
-  });
-
-  it("rejects non-contiguous addresses", function() {
-    var input =
-      ":100000000C9461000C947E000C947E000C947E0095 \n" +
-      ":108888000C9461000C947E000C947E000C947E0095 \n" +
-      ":00000001FF \n\n";
-
-    // "0000 and 8888 are not contiguous addresses");
-    expect(ParseHexFile(input)).toEqual("FAIL");
   });
 
   it ("handles contiguous addresses", function() {
@@ -31,6 +21,16 @@ describe("HexParser", function() {
         0x0c, 0x94, 0x61, 0x00, 0x0C, 0x94, 0x7E, 0x00, 0x0C, 0x94, 0x7E, 0x00, 0x0C, 0x94, 0x7E, 0x00];
 
     expect(ParseHexFile(input)).toEqual(expectedOutput);
+  });
+
+  it("rejects non-contiguous addresses", function() {
+    var input =
+      ":100000000C9461000C947E000C947E000C947E0095 \n" +
+      ":108888000C9461000C947E000C947E000C947E0095 \n" +
+      ":00000001FF \n\n";
+
+    // "0000 and 8888 are not contiguous addresses");
+    expect(ParseHexFile(input)).toEqual("FAIL");
   });
 
   it("rejects file with missing EOF", function() {
