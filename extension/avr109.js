@@ -160,16 +160,17 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
     }
 
     if (appeared.length == 0) {
-      setTimeout(function() { board.waitForNewDevice_(newDevices, doneCb, deadline); }, 100);
+      setTimeout(function() {
+        board.waitForNewDevice_(newDevices, doneCb, deadline);
+      }, 10);
     } else {
       log(kDebugNormal, "Aha! Connecting to: " + appeared[0]);
-      // TODO: really need to settimeout here?
-      setTimeout(function() {
-        serial.connect(
-          appeared[appeared.length - 1],
-          { bitrate: 57600 },
-          function(connectArg) { board.serialConnected_(connectArg, doneCb) })
-      }, 500);
+      // Note: I removed what I think was an unnecessary setTimeout(500)
+      // here.  If things look buggy, we can add it back
+      serial.connect(
+        appeared[appeared.length - 1],
+        { bitrate: 57600 },
+        function(connectArg) { board.serialConnected_(connectArg, doneCb) });
     }
   });
 }
@@ -228,8 +229,6 @@ Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
 
 
 Avr109Board.prototype.beginProgramming_ = function(boardAddress, data, doneCb) {
-  log(kDebugFine, "beginProgramming(" + boardAddress + ", <data:" + data.length
-      + ">, <doneCB>)");
   var board = this;
   var addressBytes = storeAsTwoBytes(boardAddress);
   this.writeAndGetReply_(
@@ -246,8 +245,11 @@ Avr109Board.prototype.beginProgramming_ = function(boardAddress, data, doneCb) {
 }
 
 Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
-  log(kDebugFine, "writePage(" + pageNo + ", <data:" + data.length
-      + ">, <doneCB>)");
+  var numPages = data.length / this.pageSize_;
+  if (pageNo == 0 || pageNo == numPages - 1 || (pageNo + 1) % 5 == 0) {
+    log(kDebugFine, "Writing page " + (pageNo + 1) + " of " + numPages);
+  }
+
   var board = this;
   var pageSize = this.pageSize_;
 
