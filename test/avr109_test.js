@@ -1,27 +1,3 @@
-var MemBlock = function(size) {
-  this.size_ = size;
-  this.cursor_ = -1;
-  this.data_ = new Array(size);
-}
-
-MemBlock.prototype.seek = function(address) {
-  this.cursor_ = address;
-}
-
-MemBlock.prototype.write = function(data) {
-  for (var i = 0; i < data.length; ++i) {
-    this.data_[this.cursor_++] = data[i];
-  }
-}
-
-var genData = function(length) {
-  var a = [];
-  for (var i = 0; i < length; ++i) {
-    a.push(i);
-  }
-  return a;
-}
-
 describe("AVR109 board", function() {
   var board;
   var fakeserial;
@@ -38,55 +14,6 @@ describe("AVR109 board", function() {
     status = s;
   }
 
-  var ExactReply = function(reply) {
-    this.reply_ = reply;
-  }
-  ExactReply.prototype.handle = function(unusedPayload) {
-    return this.reply_;
-  }
-
-
-  var ExactMatcher = function(target) {
-    this.target_ = target;
-  }
-  ExactMatcher.prototype.matches = function(candidate) {
-    var hexCandidate = binToHex(candidate);
-    log(kDebugFine, "Target: " + hexRep(this.target_) + " vs. candidate: " +
-        hexRep(hexCandidate));
-    if (hexCandidate.length != this.target_.length) {
-      return false;
-    }
-
-    for (var i = 0; i < this.target_.length; ++i) {
-      if (this.target_[i] != hexCandidate[i]) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  var PrefixMatcher = function(target) {
-    this.target_ = target;
-  }
-  PrefixMatcher.prototype.matches = function(candidate) {
-    var hexCandidate = binToHex(candidate);
-    log(kDebugFine, "Prefix target: " + hexRep(this.target_)
-        + " vs. candidate: " + hexRep(hexCandidate));
-
-    if (hexCandidate.length <= this.target_.length) {
-      return false;
-    }
-
-    for (var i = 0; i < this.target_.length; ++i) {
-      if (this.target_[i] != hexCandidate[i]) {
-        return false;
-      }
-    }
-
-    return true;
-  };
-
   var disconnectListener = function(cid) {
     // magic leonardo bitrate
     sawKickBitrate = (fakeserial.latestBitrate_ == Avr109Board.MAGIC_BITRATE);
@@ -101,80 +28,68 @@ describe("AVR109 board", function() {
   };
 
   beforeEach(function() {
-    this.addMatchers({
-      toBeOk: function() {
-        this.message = function() {
-          return "Status not OK. Message: '" + 
-            this.actual.errorMessage() + "'";
-        }
+    this.addMatchers(commonMatchers);
 
-        return this.actual.ok() &&
-          this.actual.errorMessage() == null;
-      },
-
-      toBeError: function() {
-        this.message = function() {
-          return "Expected status to be error, but was OK.";
-        };
-        return !this.actual.ok();
-      },
-    });
-
-    
     fakeserial = new FakeSerial();
     notified = false;
+
+    memBlock = new MemBlock(PAGE_SIZE * 10);
 
     // Enable simulation of kicking into the bootloader:
     fakeserial.addDisconnectListener(disconnectListener);
 
-    // Enable checking of the software version for all tests
-    // TODO: factor out these constants
-    fakeserial.addHook(new ExactMatcher([AVR.SOFTWARE_VERSION]),
-                       new ExactReply([0x31, AVR.CR]));
+    // TODO: verify that we transition to each state, and do
+    // so in the correct order.
+    fakeserial.addHook(
+      new ExactMatcher([AVR.SOFTWARE_VERSION]),
+      new ExactReply([0x31, AVR.CR]));
 
-    fakeserial.addHook(new ExactMatcher([AVR.ENTER_PROGRAM_MODE]),
-                       new ExactReply([AVR.CR]));
+    fakeserial.addHook(
+      new ExactMatcher([AVR.ENTER_PROGRAM_MODE]),
+      new ExactReply([AVR.CR]));
 
-    fakeserial.addHook(new PrefixMatcher([AVR.SET_ADDRESS]),
-                       { handle: function(payload) {
-                         var hexData = binToHex(payload);
-                         if (hexData.length != 3) {
-                           log(kDebugError, "Malformed SET_ADDRESS");
-                         } else {
-                           var address = hexData[2] + (hexData[1] << 16);
-                           memBlock.seek(address);
-                           return [AVR.CR];
-                         }
-                       }});
+    fakeserial.addHook(
+      new PrefixMatcher([AVR.SET_ADDRESS]),
+      { handle: function(payload) {
+        var hexData = binToHex(payload);
+        if (hexData.length != 3) {
+          log(kDebugError, "Malformed SET_ADDRESS (wrong length)");
+        } else {
+          var address = hexData[2] + (hexData[1] << 16);
+          memBlock.seek(address);
+          return [AVR.CR];
+        }
+      }});
 
-    fakeserial.addHook(new PrefixMatcher([AVR.WRITE]),
-                       { handle: function(payload) {
-                         var hexData = binToHex(payload);
-                         if (hexData.length < 4) {
-                           log(kDebugError, "Malformed WRITE (too short)");
-                         } else if (hexData[3] != 0x46) { // F
-                           log(kDebugError, "Malformed WRITE (no 'F')");
-                         } else {
-                           var length = hexData[2] + (hexData[1] << 16);
-                           var payload = hexData.slice(4);
-                           if (payload.length != length) {
-                             log(kDebugError, "Malformed WRITE (bad length. " +
-                                "Declared: " + length + ", Actual: " +
-                                payload.length + ")");
-                           } else {
-                             memBlock.write(payload);
-                             return [AVR.CR];
-                           }
-                         }
-                       }});
+    fakeserial.addHook(
+      new PrefixMatcher([AVR.WRITE]),
+      { handle: function(payload) {
+        var hexData = binToHex(payload);
+        if (hexData.length < 4) {
+          log(kDebugError, "Malformed WRITE (too short)");
+        } else if (hexData[3] != 0x46) { // F
+          log(kDebugError, "Malformed WRITE (no 'F')");
+        } else {
+          var length = hexData[2] + (hexData[1] << 16);
+          var payload = hexData.slice(4);
+          if (payload.length != length) {
+            log(kDebugError, "Malformed WRITE (bad length. " +
+                "Declared: " + length + ", Actual: " +
+                payload.length + ")");
+          } else {
+            memBlock.write(payload);
+            return [AVR.CR];
+          }
+        }
+      }});
 
-    fakeserial.addHook(new ExactMatcher([AVR.LEAVE_PROGRAM_MODE]),
-                       new ExactReply([AVR.CR]));
+    fakeserial.addHook(
+      new ExactMatcher([AVR.LEAVE_PROGRAM_MODE]),
+      new ExactReply([AVR.CR]));
 
-    fakeserial.addHook(new ExactMatcher([AVR.EXIT_BOOTLOADER]),
-                       new ExactReply([AVR.CR]));
-
-    memBlock = new MemBlock(PAGE_SIZE * 10);
+    fakeserial.addHook(
+      new ExactMatcher([AVR.EXIT_BOOTLOADER]),
+      new ExactReply([AVR.CR]));
 
     var r = NewAvr109Board(fakeserial, PAGE_SIZE);
     expect(r.status).toBeOk();
@@ -182,12 +97,8 @@ describe("AVR109 board", function() {
   });
 
   it("can't write until connected", function() {
-    runs(function() {
-      board.writeFlash(
-        0,
-        genData(8),
-        justRecordStatus);
-    });
+    runs(function() { board.writeFlash(
+      0, genData(PAGE_SIZE), justRecordStatus); } );
 
     waitsFor(function() { return notified; },
              "Callback should have been called", 1000);
@@ -196,7 +107,20 @@ describe("AVR109 board", function() {
   });
 
   it("can't read until connected", function() {
-    expect(board.readFlash(0)).toBeError();
+    var data;
+
+    var recordStatusAndData = function(arg) {
+      notified = true;
+      status = arg.status;
+      data = arg.data;
+    }
+
+    runs(function() { board.readFlash(0, PAGE_SIZE, recordStatusAndData); } );
+
+    waitsFor(function() { return notified; },
+             "Callback should have been called", 1000);
+
+    runs(function() { expect(status).toBeError(); } );
   });
 
   it("connects", function() {

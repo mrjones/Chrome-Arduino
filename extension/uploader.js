@@ -432,7 +432,6 @@ function stkProgramFlash(connectionId, data, offset, length, doneCallback) {
 function storeAsTwoBytes(n) {
   var lo = (n & 0x00FF);
   var hi = (n & 0xFF00) >> 8;
-  log(kDebugFine, "storeTwoBytes(" + n + ") --> [" + hi + "," + lo + "]");
   return [hi, lo];
 }
 

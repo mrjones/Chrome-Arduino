@@ -69,12 +69,14 @@ Avr109Board.prototype.writeFlash = function(boardAddress, data, doneCb) {
     });
 };
 
-Avr109Board.prototype.readFlash = function(boardAddress) {
+Avr109Board.prototype.readFlash = function(boardAddress, length, doneCb) {
   if (this.state_ != Avr109Board.State.CONNECTED) {
-    return Status.Error("Not connected to board: " + this.state_);
+    doneCb({
+      status: Status.Error("Not connected to board: " + this.state_) });
+  } else {
+    doneCb({
+      status: Status.Error("Not implemented")});
   }
-
-  console.log(kDebugError, "Not implemented");
 };
 
 // IMPLEMENTATION
@@ -94,8 +96,6 @@ Avr109Board.prototype.readHandler_ = null;
 Avr109Board.MAGIC_BITRATE = 1200;
 
 Avr109Board.prototype.readDispatcher_ = function(readArg) {
-  log(kDebugFine, "Read: " + JSON.stringify(readArg));
-  log(kDebugFine, "Data: " + hexRep(binToHex(readArg.data)));
   if (this.readHandler_ != null) {
     this.readHandler_(readArg);
     return;
