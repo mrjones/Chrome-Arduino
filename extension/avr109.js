@@ -113,8 +113,8 @@ Avr109Board.prototype.kickBootloader_ = function(originalDeviceName, doneCb) {
   var board = this;
 
   serial.getDevices(function(devicesArg) {
-    log(kDebugFine, oldDevices.length + " devices");
     oldDevices = devicesArg;
+    log(kDebugFine, oldDevices.length + " devices");
     serial.connect(originalDeviceName, {bitrate: Avr109Board.MAGIC_BITRATE }, function(connectArg) {
       log(kDebugFine, "Magic connect: " + JSON.stringify(connectArg));
       // TODO: validate connect arg
@@ -122,7 +122,8 @@ Avr109Board.prototype.kickBootloader_ = function(originalDeviceName, doneCb) {
         log(kDebugFine, "Magic disconnect: " + JSON.stringify(disconnectArg));
         // TODO: validate disconnect arg
         board.waitForNewDevice_(
-          oldDevices, doneCb, board.clock_.nowMillis() + 10 * 1000);
+//          oldDevices, doneCb, board.clock_.nowMillis() + 10 * 1000);
+          oldDevices, doneCb, board.clock_.nowMillis() + 1000);
       });
     });
   });
@@ -192,7 +193,6 @@ Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   }
 
   this.connectionId_ = connectArg.connectionId;
-  this.serial_.onRecieve.
   this.serial_.onReceive.addListener(this.readDispatcher_.bind(this));
   this.startCheckSoftwareVersion_(doneCb);
 }
@@ -211,8 +211,6 @@ Avr109Board.prototype.write_ = function(payload) {
 
 
 Avr109Board.prototype.setReadHandler_ = function(handler) {
-//  log(kDebugFine, "Setting read handler: " + handler);
-  log(kDebugFine, "Setting read handler: " + handler);
   this.readHandler_ = handler;
 };
 
@@ -234,7 +232,7 @@ Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
     this.state_ = Avr109Board.State.CONNECTED;
     doneCb(Status.OK);
   } else {
-    doneCb(Status.ERROR("Unexpected software version response: " + hexRep(hexData)));
+    doneCb(Status.Error("Unexpected software version response: " + hexRep(hexData)));
   }
 
   // TODO: Deadline?
