@@ -277,14 +277,28 @@ Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
 }
 
 Avr109Board.prototype.doneProgramming_ = function(doneCb) {
+  var board = this;
   this.writeAndGetReply_(
     [AVR.LEAVE_PROGRAM_MODE],
     function(readArg) {
       var hexData = binToHex(readArg.data);
       if (hexData.length == 1 && hexData[0] == AVR.CR) {
-        doneCb(Status.OK);
+        board.exitBootloader_(doneCb);
       } else {
         doneCb(Status.Error("Error leaving progam mode: " + hexRep(hexData)));
       }
     });
 };
+
+Avr109Board.prototype.exitBootloader_ = function(doneCb) {
+  this.writeAndGetReply_(
+    [AVR.EXIT_BOOTLOADER],
+    function(readArg) {
+      var hexData = binToHex(readArg.data);
+      if (hexData.length == 1 && hexData[0] == AVR.CR) {
+        doneCb(Status.OK);
+      } else {
+        doneCb(Status.Error("Error leaving bootloader: " + hexRep(hexData)));
+      }
+    });
+}
