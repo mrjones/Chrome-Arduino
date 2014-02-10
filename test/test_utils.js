@@ -84,8 +84,6 @@ var ExactMatcher = function(target) {
 
 ExactMatcher.prototype.matches = function(candidate) {
   var hexCandidate = binToHex(candidate);
-  log(kDebugFine, "Target: " + hexRep(this.target_) + " vs. candidate: " +
-      hexRep(hexCandidate));
   if (hexCandidate.length != this.target_.length) {
     return false;
   }
@@ -106,8 +104,6 @@ var PrefixMatcher = function(target) {
 
 PrefixMatcher.prototype.matches = function(candidate) {
   var hexCandidate = binToHex(candidate);
-  log(kDebugFine, "Prefix target: " + hexRep(this.target_)
-      + " vs. candidate: " + hexRep(hexCandidate));
 
   if (hexCandidate.length <= this.target_.length) {
     return false;

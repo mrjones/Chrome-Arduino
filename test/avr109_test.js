@@ -9,21 +9,17 @@ describe("AVR109 board", function() {
   var PAGE_SIZE = 8;
 
   var justRecordStatus = function(s) {
-    console.log("justRecordStatus(" + JSON.stringify(s) + ")");
     notified = true;
     status = s;
   }
 
   var disconnectListener = function(cid) {
-    log(kDebugNormal, "disconnect listener...");
     // magic leonardo bitrate
     sawKickBitrate = (fakeserial.latestBitrate_ == Avr109Board.MAGIC_BITRATE);
     if (sawKickBitrate) {
       setTimeout(function() {
-        log(kDebugNormal, "removing entry...");
         var popped = fakeserial.deviceList_.pop();
         setTimeout(function() {
-          log(kDebugNormal, "adding entry...");
           fakeserial.deviceList_.push(popped);
         }, 100);
       }, 100);

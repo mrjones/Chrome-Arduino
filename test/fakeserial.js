@@ -93,7 +93,6 @@ FakeSerial.prototype.hooks_ = [];
 
 FakeSerial.prototype.addHook = function(matcher, handler) {
   var o = {matcher: matcher, handler: handler};
-  log(kDebugFine, "addHook: " + JSON.stringify(o));
   this.hooks_.push(o);
 };
 
@@ -127,7 +126,6 @@ FakeSerial.prototype.getPortname = function() {
 };
 
 FakeSerial.prototype.execute_ = function(callback, args) {
-//  log(kDebugFine, "Executing callback with args: " + JSON.stringify(args));
   callback(args);
 };
 
@@ -137,7 +135,6 @@ function FakeSerialReadAdapter(fakeSerial) {
 
 FakeSerialReadAdapter.prototype.addListener = function(listener) {
   this.fs_.readListeners_.push(listener);
-  console.log("Num listeners: " + this.fs_.readListeners_.length);
 }
 
 FakeSerialReadAdapter.prototype.fs_ = null;

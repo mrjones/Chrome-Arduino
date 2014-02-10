@@ -37,7 +37,6 @@ Avr109Board.prototype.connect = function(deviceName, doneCb) {
   }
 
   this.readHandler_ = null;
-  log(kDebugFine, "Unset read handler...");
   this.state_ = Avr109Board.State.CONNECTING;
   this.kickBootloader_(deviceName, doneCb);
 };
@@ -113,19 +112,15 @@ Avr109Board.prototype.readDispatcher_ = function(readArg) {
 }
 
 Avr109Board.prototype.kickBootloader_ = function(originalDeviceName, doneCb) {
-  log(kDebugFine, "kickBootloader(" + originalDeviceName + ")");
   var oldDevices = [];
   var serial = this.serial_;
   var board = this;
 
   serial.getDevices(function(devicesArg) {
     oldDevices = devicesArg;
-    log(kDebugFine, oldDevices.length + " devices");
     serial.connect(originalDeviceName, {bitrate: Avr109Board.MAGIC_BITRATE }, function(connectArg) {
-      log(kDebugFine, "Magic connect: " + JSON.stringify(connectArg));
       // TODO: validate connect arg
       serial.disconnect(connectArg.connectionId, function(disconnectArg) {
-        log(kDebugFine, "Magic disconnect: " + JSON.stringify(disconnectArg));
         // TODO: validate disconnect arg
         board.waitForNewDevice_(
 //          oldDevices, doneCb, board.clock_.nowMillis() + 10 * 1000);
@@ -166,10 +161,10 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
     var disappeared = findMissingIn(oldDevices, newDevices);
  
     for (var i = 0; i < disappeared.length; ++i) {
-      log(kDebugNormal, "Disappeared: " + disappeared[i]);
+      log(kDebugFine, "Disappeared: " + disappeared[i]);
     }
     for (var i = 0; i < appeared.length; ++i) {
-      log(kDebugNormal, "Appeared: " + appeared[i]);
+      log(kDebugFine, "Appeared: " + appeared[i]);
     }
 
     if (appeared.length == 0) {
@@ -189,7 +184,6 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
 }
 
 Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
-  log(kDebugFine, "serialConnected - " + JSON.stringify(connectArg));
   // TODO: test this?
   if (typeof(connectArg) == "undefined" ||
       typeof(connectArg.connectionId) == "undefined" ||
@@ -225,7 +219,6 @@ Avr109Board.prototype.setReadHandler_ = function(handler) {
 };
 
 Avr109Board.prototype.startCheckSoftwareVersion_ = function(doneCb) {
-  log(kDebugFine, "startCheckSoftwareVersion");
   var board = this;
   this.writeAndGetReply_(
     [ AVR.SOFTWARE_VERSION ],
@@ -235,7 +228,6 @@ Avr109Board.prototype.startCheckSoftwareVersion_ = function(doneCb) {
 }
 
 Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
-  log(kDebugFine, "finishCheckSoftwareVersion - " + JSON.stringify(readArg));
   var hexData = binToHex(readArg.data);
   // TODO: actuall examine response
   if (hexData.length == 2) {
@@ -250,7 +242,6 @@ Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
 
 
 Avr109Board.prototype.beginProgramming_ = function(boardAddress, data, doneCb) {
-  log(kDebugFine, "beginProgramming - " + boardAddress + " data:" + data.length);
   var board = this;
   var addressBytes = storeAsTwoBytes(boardAddress);
   this.writeAndGetReply_(
@@ -267,7 +258,6 @@ Avr109Board.prototype.beginProgramming_ = function(boardAddress, data, doneCb) {
 }
 
 Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
-  log(kDebugFine, "writePage - " + pageNo + " data:" + data.length);
   var numPages = data.length / this.pageSize_;
   if (pageNo == 0 || pageNo == numPages - 1 || (pageNo + 1) % 5 == 0) {
     log(kDebugFine, "Writing page " + (pageNo + 1) + " of " + numPages);
@@ -302,12 +292,10 @@ Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
 }
 
 Avr109Board.prototype.doneProgramming_ = function(doneCb) {
-  log(kDebugFine, "doneProgramming()");
   var board = this;
   this.writeAndGetReply_(
     [AVR.LEAVE_PROGRAM_MODE],
     function(readArg) {
-      log(kDebugFine, "in doneprogramming's callback");
       var hexData = binToHex(readArg.data);
       if (hexData.length == 1 && hexData[0] == AVR.CR) {
         board.exitBootloader_(doneCb);
@@ -318,7 +306,6 @@ Avr109Board.prototype.doneProgramming_ = function(doneCb) {
 };
 
 Avr109Board.prototype.exitBootloader_ = function(doneCb) {
-  log(kDebugFine, "exitBootloader()");
   this.writeAndGetReply_(
     [AVR.EXIT_BOOTLOADER],
     function(readArg) {
