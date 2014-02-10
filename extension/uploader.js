@@ -24,7 +24,8 @@ var STK_SW_VER_MINOR = 0x82;
 var databuffer = { };
 
 var globalDispatcher = new SerialDispatcher();
-if (chrome.serial) {
+if (typeof(chrome) != "undefined" &&
+    typeof(chrome.serial) != "undefined") {
   // Don't want to do this in unit tests
   // TODO: make this a little more elegant?
   chrome.serial.onReceive.addListener(
