@@ -123,8 +123,8 @@ Avr109Board.prototype.kickBootloader_ = function(originalDeviceName, doneCb) {
       serial.disconnect(connectArg.connectionId, function(disconnectArg) {
         // TODO: validate disconnect arg
         board.waitForNewDevice_(
-//          oldDevices, doneCb, board.clock_.nowMillis() + 10 * 1000);
-          oldDevices, doneCb, board.clock_.nowMillis() + 1000);
+          oldDevices, doneCb, board.clock_.nowMillis() + 10 * 1000);
+//          oldDevices, doneCb, board.clock_.nowMillis() + 1000);
       });
     });
   });
@@ -174,11 +174,11 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
     } else {
       log(kDebugNormal, "Aha! Connecting to: " + appeared[0]);
       // I'm not 100% sure why we need this setTimeout
-//      setTimeout(function() {
+      setTimeout(function() {
         serial.connect(appeared[0], { bitrate: 57600 }, function(connectArg) {
           board.serialConnected_(connectArg, doneCb);
         });
-  //    }, 500);
+      }, 500);
     }
   });
 }
@@ -188,7 +188,7 @@ Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   if (typeof(connectArg) == "undefined" ||
       typeof(connectArg.connectionId) == "undefined" ||
       connectArg.connectionId == -1) {
-    doneCb(Status.Error("Couldn't connect to board"));
+    doneCb(Status.Error("Couldn't connect to board. " + connectArg + " / " + connectArg.connectionId));
     return;
   }
 
