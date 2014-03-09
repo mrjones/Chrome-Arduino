@@ -586,10 +586,11 @@ var AVR = {
   ENTER_PROGRAM_MODE: 0x50,
   LEAVE_PROGRAM_MODE: 0x4c,
   SET_ADDRESS: 0x41,
-  WRITE: 0x42,
+  WRITE: 0x42, // TODO: WRITE_PAGE
   TYPE_FLASH: 0x46,
   EXIT_BOOTLOADER: 0x45,
   CR: 0x0D,
+  READ_PAGE: 0x67,
 };
 
 function avrWriteThenRead(connectionId, writePayload, readSize, callback) {

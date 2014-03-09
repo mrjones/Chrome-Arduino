@@ -83,6 +83,20 @@ describe("AVR109 board", function() {
       }});
 
     fakeserial.addHook(
+      new PrefixMatcher([AVR.READ_PAGE]),
+      { handle: function(payload) {
+        var hexData = binToHex(payload);
+        if (hexData.length < 4) {
+          log(kDebugError, "Malformed READ (too short)");
+        } else if (hexData[3] != 0x46) { // F
+          log(kDebugError, "Malformed READ (no 'F')");
+        } else {
+          var length = hexData[2] + (hexData[1] << 16);
+          return memBlock.read(length)
+        }
+      }});
+
+    fakeserial.addHook(
       new ExactMatcher([AVR.LEAVE_PROGRAM_MODE]),
       new ExactReply([AVR.CR]));
 

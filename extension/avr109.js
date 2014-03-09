@@ -252,7 +252,7 @@ Avr109Board.prototype.beginProgramming_ = function(boardAddress, data, doneCb) {
       if (hexData.length == 1 && hexData[0] == 0x0D) {
         board.writePage_(0, data, doneCb);
       } else {
-        return doneCb(Status.Error("Error setting address."));
+        return doneCb(Status.Error("Error setting address for programming."));
       }
     });
 }
@@ -281,7 +281,10 @@ Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
       var hexData = binToHex(readArg.data);
       if (hexData.length == 1 && hexData[0] == 0x0D) {
         if (pageSize * (pageNo + 1) >= data.length) {
-          return board.doneProgramming_(doneCb);
+          // TODO(mrjones): get board address from beginProgramming
+          var boardAddress = 0;
+          return board.beginVerification_(boardAddress, data, doneCb);
+//          return board.exitProgramMode_(doneCb);
         }
         board.writePage_(pageNo + 1, data, doneCb);
       } else {
@@ -291,7 +294,57 @@ Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
     });
 }
 
-Avr109Board.prototype.doneProgramming_ = function(doneCb) {
+Avr109Board.prototype.beginVerification_ = function(boardAddress, data, doneCb) {
+  var board = this;
+  var addressBytes = storeAsTwoBytes(boardAddress);
+  this.writeAndGetReply_(
+    [AVR.SET_ADDRESS, addressBytes[1], addressBytes[0]],
+    function(readArg) {
+      var hexData = binToHex(readArg.data);
+      if (hexData.length == 1 && hexData[0] == 0x0D) {
+        board.verifyPage_(0, data, doneCb);
+      } else {
+        return doneCb(Status.Error("Error setting address for verification."));
+      }
+
+    });
+}
+
+Avr109Board.prototype.verifyPage_ = function(pageNo, data, doneCb) {
+  var numPages = data.length / this.pageSize_;
+  if (pageNo == 0 || pageNo == numPages - 1 || (pageNo + 1) % 5 == 0) {
+    log(kDebugFine, "Verifying page " + (pageNo + 1) + " of " + numPages);
+  }
+
+  var board = this;
+  var pageSize = this.pageSize_;
+  var expected = data.slice(pageNo * this.pageSize_,
+                            (pageNo + 1) * this.pageSize_);
+  var sizeBytes = storeAsTwoBytes(this.pageSize_);
+
+  this.writeAndGetReply_(
+    [AVR.READ_PAGE, sizeBytes[0], sizeBytes[1], AVR.TYPE_FLASH],
+    function(readArg) {
+      var hexData = binToHex(readArg.data);
+      if (hexData.length != pageSize) {
+        doneCb(Status.Error("Error verifying. Page #" + pageNo + ". Read wrong size (" + hexData.length + " vs. page size: " + pageSize));
+        return;
+      }
+      for (var i = 0; i < pageSize; i++) {
+        if (hexData[i] != data[pageSize * pageNo + i]) {
+          doneCb(Status.Error("Error verifying. Page #" + pageNo + ". Read wrong size (" + hexData.length + " vs. page size: " + pageSize));          
+          return;
+        }
+      }
+
+      if (pageSize * (pageNo + 1) >= data.length) {
+        return board.exitProgramMode_(doneCb);
+      }
+      board.verifyPage_(pageNo + 1, data, doneCb);
+    });
+}
+
+Avr109Board.prototype.exitProgramMode_ = function(doneCb) {
   var board = this;
   this.writeAndGetReply_(
     [AVR.LEAVE_PROGRAM_MODE],

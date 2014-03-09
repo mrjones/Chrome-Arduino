@@ -67,6 +67,14 @@ MemBlock.prototype.write = function(data) {
   }
 }
 
+MemBlock.prototype.read = function(n) {
+  var accum = new Array(n);
+  for (var i = 0; i < n; ++i) {
+    accum[i] = this.data_[this.cursor_++];
+  }
+  return accum;
+}
+
 // -----
 
 var ExactReply = function(reply) {
