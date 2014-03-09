@@ -322,25 +322,33 @@ Avr109Board.prototype.verifyPage_ = function(pageNo, data, doneCb) {
                             (pageNo + 1) * this.pageSize_);
   var sizeBytes = storeAsTwoBytes(this.pageSize_);
 
+  var pageOffset = 0;
   this.writeAndGetReply_(
     [AVR.READ_PAGE, sizeBytes[0], sizeBytes[1], AVR.TYPE_FLASH],
+    // TODO(mrjones): test for handling fragmented response payloads
     function(readArg) {
       var hexData = binToHex(readArg.data);
-      if (hexData.length != pageSize) {
-        doneCb(Status.Error("Error verifying. Page #" + pageNo + ". Read wrong size (" + hexData.length + " vs. page size: " + pageSize));
+//      log(kDebugFine, "Got " + hexData.length + " bytes to verify");
+      if (pageOffset + hexData.length > pageSize) {
+        doneCb(Status.Error("Error verifying. Page #" + pageNo + ". Read too long (" + hexData.length + " vs. page size: " + pageSize));
         return;
       }
-      for (var i = 0; i < pageSize; i++) {
-        if (hexData[i] != data[pageSize * pageNo + i]) {
-          doneCb(Status.Error("Error verifying. Page #" + pageNo + ". Read wrong size (" + hexData.length + " vs. page size: " + pageSize));          
+      for (var i = 0; i < hexData.length; i++) {
+        if (hexData[i] != data[pageSize * pageNo + pageOffset]) {
+          doneCb(Status.Error("Error verifying. Page #" + pageNo + ". Data mismatch at offset " + pageOffset + "(expected: " + data[pageSize * pageNo + pageOffset] + ", actual:" + hexData[i] + ")"));
           return;
         }
+        pageOffset++;
       }
 
-      if (pageSize * (pageNo + 1) >= data.length) {
-        return board.exitProgramMode_(doneCb);
+      if (pageOffset == pageSize) {
+        if (pageSize * (pageNo + 1) >= data.length) {
+          return board.exitProgramMode_(doneCb);
+        }
+        board.verifyPage_(pageNo + 1, data, doneCb);
+      } else {
+//        log(kDebugFine, "Waiting for " + (pageSize - pageOffset) + " more bytes...");
       }
-      board.verifyPage_(pageNo + 1, data, doneCb);
     });
 }
 
