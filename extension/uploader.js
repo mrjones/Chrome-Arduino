@@ -72,7 +72,8 @@ function uploadBlinkSketch(deviceName, protocol) {
   log(kDebugFine, "uploading blink sketch");
   var hexfile = 'http://linode.mrjon.es/blink.hex';
   if (protocol == 'avr109' || protocol == 'avr109_beta') {
-    hexfile = 'http://linode.mrjon.es/blink-micro.hex'
+    //
+    hexfile = 'http://linode.mrjon.es/blink-micro.hex?bustcache=' + (new Date().getTime());
   }
 
   fetchProgram(hexfile, function(programBytes) { 
@@ -87,9 +88,13 @@ function fetchProgram(url, handler) {
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
-      var programBytes = ParseHexFile(xhr.responseText);
-      log(kDebugFine, "Program Data: " + xhr.responseText.substring(0,25) + "...");
-      handler(programBytes);
+      if (xhr.status == 200) {
+        var programBytes = ParseHexFile(xhr.responseText);
+        log(kDebugFine, "Program Data: " + xhr.responseText.substring(0,25) + "...");
+        handler(programBytes);
+      } else {
+        log(kDebugError, "Bad fetch: " + xhr.status);
+      }
     }
   };
   xhr.open("GET", url, true);
