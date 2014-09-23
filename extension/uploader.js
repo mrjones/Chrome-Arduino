@@ -253,7 +253,9 @@ function stkConsumeMessage(connectionId, payloadSize, callback) {
           });
       } else {
         // Don't tight-loop waiting for the message.
-        readFromBuffer(connectionId, 1024, handleRead);
+        setTimeout(function() {
+          readFromBuffer(connectionId, 1024, handleRead);
+        }, 10);
       }
 
     }
