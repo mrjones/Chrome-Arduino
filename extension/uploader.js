@@ -41,9 +41,9 @@ function readToBuffer(readArg) {
 
   var hexData = binToHex(readArg.data);
 
-  log(kDebugFine, "Pushing " + hexData.length + " bytes onto buffer for: " + readArg.connectionId);
+  log(kDebugFine, "Pushing " + hexData.length + " bytes onto buffer for: " + readArg.connectionId + " " + hexData);
   for (var i = 0; i < hexData.length; ++i) {
-    log(kDebugFine, i);
+//    log(kDebugFine, i);
     databuffer[readArg.connectionId].push(hexData[i]);
   }
   log(kDebugFine, "Buffer for " + readArg.connectionId + " now of size " + databuffer[readArg.connectionId].length);
@@ -61,8 +61,10 @@ function readFromBuffer(connectionId, maxBytes, callback) {
 
   var accum = [];
   for (var i = 0; i < bytes; ++i) {
-    accum.push(databuffer[connectionId].pop());
+    accum.push(databuffer[connectionId].shift());
   }
+
+  log(kDebugFine, "readFromBuffer -> " + binToHex(accum));
 
   callback({bytesRead: bytes, data: accum});
 }
@@ -118,7 +120,7 @@ function uploadCompiledSketch(hexData, deviceName, protocol) {
     chrome.serial.onReceive.addListener(readToBuffer);
   }
   if (protocol == "stk500") {
-    chrome.serial.connect(deviceName, { bitrate: 57600 }, stkConnectDone);
+    chrome.serial.connect(deviceName, { bitrate: 115200 }, stkConnectDone);
   } else if (protocol == "avr109") {
     // actually want tocheck that board is leonardo / micro / whatever
     kickLeonardoBootloader(deviceName);
@@ -165,6 +167,7 @@ function uploadCompiledSketch(hexData, deviceName, protocol) {
 //   3. int[] accum: if success is 'true' the payload data read (not
 //      including STK_INSYNC or STK_OK.
 function stkConsumeMessage(connectionId, payloadSize, callback) {
+  log(kDebugNormal, "stkConsumeMessage(conn=" + connectionId + ", payload_size=" + payloadSize + " ...)");
   var ReadState = {
     READY_FOR_IN_SYNC: 0,
     READY_FOR_PAYLOAD: 1,
@@ -175,7 +178,7 @@ function stkConsumeMessage(connectionId, payloadSize, callback) {
 
   var accum = [];
   var state = ReadState.READY_FOR_IN_SYNC;
-  var kMaxReads = 10;
+  var kMaxReads = 100;
   var reads = 0;
   var payloadBytesConsumed = 0;
 
@@ -191,35 +194,41 @@ function stkConsumeMessage(connectionId, payloadSize, callback) {
       log(kDebugFine, "No data read.");
     }
     for (var i = 0; i < hexData.length; ++i) {
+      log(kDebugFine, "Byte " + i + " of " + hexData.length + ": " + hexData[i]);
       if (state == ReadState.READY_FOR_IN_SYNC) {
         if (hexData[i] == STK_INSYNC) {
           if (payloadSize == 0) {
+            log(kDebugFine, "Got IN_SYNC, no payload, now READY_FOR_OK");
             state = ReadState.READY_FOR_OK;
           } else {
+            log(kDebugFine, "Got IN_SYNC, now READY_FOR_PAYLOAD");
             state = ReadState.READY_FOR_PAYLOAD;
           }
         } else {
-//          log(kDebugError, "Expected STK_INSYNC. Got: " + hexData[i] + ". Ignoring.");
+          log(kDebugError, "Expected STK_INSYNC (" + STK_INSYNC + "). Got: " + hexData[i] + ". Ignoring.");
 //          state = ReadState.ERROR;
         }
       } else if (state == ReadState.READY_FOR_PAYLOAD) {
         accum.push(hexData[i]);
         payloadBytesConsumed++;
         if (payloadBytesConsumed == payloadSize) {
+          log(kDebugFine, "Got full payload, now READY_FOR_OK");
           state = ReadState.READY_FOR_OK;
         } else if (payloadBytesConsumed > payloadSize) {
+          log(kDebugFine, "Got too many payload bytes, now ERROR")
           state = ReadState.ERROR;
           log(kDebugError, "Read too many payload bytes!");
         }
       } else if (state == ReadState.READY_FOR_OK) {
         if (hexData[i] == STK_OK) {
+          log(kDebugFine, "Got OK now DONE");
           state = ReadState.DONE;
         } else {
           log(kDebugError, "Expected STK_OK. Got: " + hexData[i]);
           state = ReadState.ERROR;
         }
       } else if (state == ReadState.DONE) {
-        log(kDebugError, "Out of sync");
+        log(kDebugError, "Out of sync (ignoring data)");
         state = ReadState.ERROR;
       } else if (state == ReadState.ERROR) {
         log(kDebugError, "In error state. Draining byte: " + hexData[i]);
