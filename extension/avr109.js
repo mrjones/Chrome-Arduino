@@ -31,6 +31,7 @@ function Avr109Board(serial, pageSize, dispatcher) {
 Avr109Board.prototype.connect = function(deviceName, doneCb) {
   // TODO: Validate doneCb
   // TODO: Validate deviceName?
+
   if (this.state_ != Avr109Board.State.DISCONNECTED) {
     doneCb(Status.Error("Can't connect. Current state: " + this.state_));
     return;
@@ -193,6 +194,7 @@ Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   }
 
   this.connectionId_ = connectArg.connectionId;
+
 //  this.serial_.onReceive.addListener(this.readDispatcher_.bind(this));
   // TODO: be more careful about removing this listener
   this.globalDispatcher_.addListener(
@@ -374,7 +376,11 @@ Avr109Board.prototype.exitBootloader_ = function(doneCb) {
       if (hexData.length == 1 && hexData[0] == AVR.CR) {
         // TODO: add a "disconnect" method, and call it everywhere
         this.globalDispatcher_.removeListener(this.connectionId_);
-        doneCb(Status.OK);
+
+        // TODO: don't forget to disconnect in all the error cases (yuck)
+        chrome.serial.disconnect(this.connectionId_, function(disconnectArg) {
+            doneCb(Status.OK);
+        });
       } else {
         doneCb(Status.Error("Error leaving bootloader: " + hexRep(hexData)));
       }
