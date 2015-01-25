@@ -1,1 +1,1 @@
-xvfb-run google-chrome --pack-extension=/home/mrjones/src/cex/extension/ --pack-extension-key=/home/mrjones/src/cex/extension.pem --enable-experimental-extension-apis
+xvfb-run google-chrome --pack-extension=./extension/ --pack-extension-key=./chrome-arduino-extension.pem --enable-experimental-extension-apis
