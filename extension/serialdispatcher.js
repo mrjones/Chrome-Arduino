@@ -12,6 +12,8 @@ SerialDispatcher.prototype.listeners_ = [];
 
 SerialDispatcher.prototype.dispatch = function(readArg) {
   for (var i = 0; i < this.listeners_.length; ++i) {
+    // TODO(mrjones): It seems like we should compare
+    // readArg.connectionId with listener.id here?
     this.listeners_[i].listener(readArg);
   }
 }
