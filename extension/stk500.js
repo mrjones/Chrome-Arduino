@@ -5,11 +5,17 @@
 // WriteFlash
 
 // API
-function Stk500Board(serial) {
+function Stk500Board(serial, dispatcher) {
   if (typeof(serial) === "undefined") {
     console.log(kDebugError, "serial is undefined");
   }
+
+  if (typeof(dispatcher) === "undefined") {
+    console.log(kDebugError, "dispatcher is undefined");
+  }
+
   this.serial_ = serial;
+  this.dispatcher_ = dispatcher;
 };
 
 Stk500Board.prototype.connect = function(deviceName, doneCb) {
@@ -49,9 +55,11 @@ Stk500Board.State = {
   CONNECTED: "connected"
 };
 
+Stk500Board.prototype.connectionId_ = -1;
+Stk500Board.prototype.dispatcher_ = null;
+Stk500Board.prototype.readHandler_ = null;
 Stk500Board.prototype.serial_ = null;
 Stk500Board.prototype.state_ = Stk500Board.State.DISCONNECTED;
-Stk500Board.prototype.connectionId_ = -1;
 
 Stk500Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   if (typeof(connectArg) == "undefined" ||
@@ -62,7 +70,21 @@ Stk500Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   }
 
   this.connectionId_ = connectArg.connectionId;
+
+  // TODO: be more careful about removing this listener
+  this.dispatcher_.addListener(
+    this.connectionId_, this.handleRead_.bind(this));
+
   this.twiddleControlLines(doneCb);
+}
+
+Stk500Board.prototype.handleRead_ = function(readArg) {
+  if (this.readHandler_ != null) {
+    this.readHandler_(readArg);
+    return;
+  }
+
+  log(kDebugNormal, "No read handler for: " + JSON.stringify(readArg));
 }
 
 Stk500Board.prototype.twiddleControlLines = function(doneCb) {
@@ -80,9 +102,13 @@ Stk500Board.prototype.twiddleControlLines = function(doneCb) {
           return;
         }
         // TODO: next setp
+
         doneCb(Status.OK);
       });
     });
   });
 }
 
+Stk500Board.prototype.drain = function(doneCb) {
+    
+}

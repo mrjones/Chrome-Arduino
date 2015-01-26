@@ -14,7 +14,11 @@ describe("STK500 board", function() {
     fakeserial = new FakeSerial();
     notified = false;
 
-    board = new Stk500Board(fakeserial);
+    var globalDispatcher = new SerialDispatcher();
+    fakeserial.onReceive.addListener(
+      globalDispatcher.dispatch.bind(globalDispatcher));
+
+    board = new Stk500Board(fakeserial, globalDispatcher);
   });
 
   it("can't write until connected", function() {
