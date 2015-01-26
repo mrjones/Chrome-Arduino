@@ -378,7 +378,7 @@ Avr109Board.prototype.exitBootloader_ = function(doneCb) {
         this.globalDispatcher_.removeListener(this.connectionId_);
 
         // TODO: don't forget to disconnect in all the error cases (yuck)
-        chrome.serial.disconnect(this.connectionId_, function(disconnectArg) {
+        this.serial_.disconnect(this.connectionId_, function(disconnectArg) {
             doneCb(Status.OK);
         });
       } else {
