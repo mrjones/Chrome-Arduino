@@ -28,8 +28,19 @@ if (typeof(chrome) != "undefined" &&
     typeof(chrome.serial) != "undefined") {
   // Don't want to do this in unit tests
   // TODO: make this a little more elegant?
+  log(kDebugNormal, "Initting global dispatcher");
   chrome.serial.onReceive.addListener(
     globalDispatcher.dispatch.bind(globalDispatcher));
+
+  chrome.serial.onReceiveError.addListener(
+    function(errorInfo) {
+      console.log("ERROR: " + JSON.stringify(errorInfo));
+    });
+
+  chrome.serial.onReceive.addListener(
+    function(errorInfo) {
+      console.log("READ: " + JSON.stringify(errorInfo));
+    });
 }
 
 function readToBuffer(readArg) {
@@ -116,11 +127,22 @@ function pad(data, pageSize) {
 function uploadCompiledSketch(hexData, deviceName, protocol) {
   sketchData_ = hexData;
   inSync_ = false;
-  if (protocol != "avr109_beta") {
+  if (protocol != "avr109_beta" && protocol != "stk500_beta") {
     chrome.serial.onReceive.addListener(readToBuffer);
   }
   if (protocol == "stk500") {
     chrome.serial.connect(deviceName, { bitrate: 115200 }, stkConnectDone);
+  } else if (protocol == "stk500_beta") {
+    var boardObj = NewStk500Board(chrome.serial, globalDispatcher);
+    if (!boardObj.status.ok()) {
+      log(kDebugError, "Couldn't create STK500 Board: " + boardObj.status.toString());
+      return;
+    }
+    var board = boardObj.board;
+
+    board.connect(deviceName, function(status) {
+      console.log("STK500 (beta) connect: " + status.toString());
+    });
   } else if (protocol == "avr109") {
     // actually want tocheck that board is leonardo / micro / whatever
     kickLeonardoBootloader(deviceName);

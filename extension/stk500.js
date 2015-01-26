@@ -4,16 +4,28 @@
 // ReadFlash
 // WriteFlash
 
+var STK = {
+  OK: 0x10,
+  IN_SYNC: 0x14,
+  CRC_EOP: 0x20,
+  GET_SYNC: 0x30,
+};
+
 // API
-function Stk500Board(serial, dispatcher) {
+function NewStk500Board(serial, dispatcher) {
   if (typeof(serial) === "undefined") {
-    console.log(kDebugError, "serial is undefined");
+    return { status: Status.Error("serial is undefined") }
   }
 
   if (typeof(dispatcher) === "undefined") {
-    console.log(kDebugError, "dispatcher is undefined");
+    return { status: Status.Error("dispatcher is undefined") }
   }
 
+  return { status: Status.OK,
+           board: new Stk500Board(serial, dispatcher) }
+}
+
+function Stk500Board(serial, dispatcher) {
   this.serial_ = serial;
   this.dispatcher_ = dispatcher;
 };
@@ -26,6 +38,7 @@ Stk500Board.prototype.connect = function(deviceName, doneCb) {
     return;
   }
 
+  log(kDebugFine, "STK500::Connect");
   this.state_ = Stk500Board.State.CONNECTING;
 
   var board = this;
@@ -45,7 +58,7 @@ Stk500Board.prototype.readFlash = function(boardAddress) {
     return Status.Error("Not connected to board: " + this.state_);
   }
 
-  console.log(kDebugError, "Not implemented");
+  log(kDebugError, "Not implemented");
 };
 
 // IMPLEMENTATION
@@ -68,17 +81,29 @@ Stk500Board.prototype.serialConnected_ = function(connectArg, doneCb) {
     doneCb(Status.Error("Unable to connect to device!"));
     return;
   }
+  log(kDebugFine, "STK500::SerialConnected " + connectArg.connectionId);
 
   this.connectionId_ = connectArg.connectionId;
 
   // TODO: be more careful about removing this listener
   this.dispatcher_.addListener(
     this.connectionId_, this.handleRead_.bind(this));
-
+  
   this.twiddleControlLines(doneCb);
 }
 
+Stk500Board.prototype.writeAndGetReply_ = function(writePayload, readHandler) {  
+  log(kDebugFine, "STK500::WriteAndGetReply");
+  this.setReadHandler_(readHandler);
+  this.write_(writePayload);
+};
+
+Stk500Board.prototype.setReadHandler_ = function(handler) {
+  this.readHandler_ = handler;
+};
+
 Stk500Board.prototype.handleRead_ = function(readArg) {
+  log(kDebugFine, "STK500::HandleRead")
   if (this.readHandler_ != null) {
     this.readHandler_(readArg);
     return;
@@ -87,9 +112,25 @@ Stk500Board.prototype.handleRead_ = function(readArg) {
   log(kDebugNormal, "No read handler for: " + JSON.stringify(readArg));
 }
 
+Stk500Board.prototype.write_ = function(payload) {
+  log(kDebugFine, "STK500::Writing::" + payload + " -> " + this.connectionId_);
+  this.serial_.send(
+    this.connectionId_, hexToBin(payload), function(writeArg) {
+      log(kDebugNormal, "WRITE: " + JSON.stringify(writeArg));
+      // TODO: veridy writeArg
+    });
+
+  this.serial_.flush(this.connectionId_, function(flushArg) {
+    log(kDebugNormal, "FLUSH: " + JSON.stringify(flushArg));
+  })
+}
+
+
 Stk500Board.prototype.twiddleControlLines = function(doneCb) {
   var cid = this.connectionId_;
   var serial = this.serial_;
+  var board = this;
+  log(kDebugFine, "STK500::TwiddlingControlLines");
   setTimeout(function() {
     serial.setControlSignals(cid, {dtr: false, rts: false}, function(ok) {
       if (!ok) {
@@ -101,14 +142,31 @@ Stk500Board.prototype.twiddleControlLines = function(doneCb) {
           doneCb(Status.Error("Couldn't set dtr/rts high"));
           return;
         }
-        // TODO: next setp
-
-        doneCb(Status.OK);
+        //        doneCb(Status.OK);
+        setTimeout(function() { board.getSync_(doneCb); }, 500);
       });
     });
   });
 }
 
-Stk500Board.prototype.drain = function(doneCb) {
-    
+Stk500Board.prototype.getSync_ = function(doneCb) {
+  log(kDebugFine, "STK500::GetSync");
+  var board = this;
+  this.write_
+  this.writeAndGetReply_(
+    [ STK.GET_SYNC, STK.CRC_EOP ],
+    function(readArg) {
+      var data = binToHex(readArg.data);
+      if (data.length == 2 &&
+          data[0] == STK.IN_SYNC && data[1] == STK.OK) {
+        log(kDebugNormal, "In Sync.");
+        board.validateVersion_(readArg, doneCb);
+      } else {
+        log(kDebugError, "Couldn't get sync");
+      }
+    });
+}
+
+Stk500Board.prototype.validateVersion_ = function(doneCb) {
+  doneCb(Status.OK);
 }

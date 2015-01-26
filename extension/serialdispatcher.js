@@ -11,6 +11,7 @@ function SerialDispatcher() {
 SerialDispatcher.prototype.listeners_ = [];
 
 SerialDispatcher.prototype.dispatch = function(readArg) {
+  log(kDebugFine, "SerialDispatcher::Dispatch to " + this.listeners_.length);
   for (var i = 0; i < this.listeners_.length; ++i) {
     // TODO(mrjones): It seems like we should compare
     // readArg.connectionId with listener.id here?
@@ -19,6 +20,7 @@ SerialDispatcher.prototype.dispatch = function(readArg) {
 }
 
 SerialDispatcher.prototype.addListener = function(id, listener) {
+  log(kDebugFine, "SerialDispatcher::AddListener " + id);
   for (var i = 0; i < this.listeners_.length; ++i) {
     if (this.listeners_[i].id == id) {
       log(kDebugError, "Already has a listener with id '" + id + "'");
