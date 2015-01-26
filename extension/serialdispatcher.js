@@ -1,3 +1,9 @@
+// I think this is intented to be a thin wrapper around the
+// chrome.serial.onReceive.addListener function. According to
+// commit dd1a44f97fd853918b89ce0cb69569737cdeb0e4, the reason
+// this class exists is because there's no removeListener in the
+// native chrome API.
+
 function SerialDispatcher() {
   this.listeners_ = [];
 };
