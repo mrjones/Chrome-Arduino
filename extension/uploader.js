@@ -133,7 +133,7 @@ function uploadCompiledSketch(hexData, deviceName, protocol) {
   if (protocol == "stk500") {
     chrome.serial.connect(deviceName, { bitrate: 115200 }, stkConnectDone);
   } else if (protocol == "stk500_beta") {
-    var boardObj = NewStk500Board(chrome.serial, globalDispatcher);
+    var boardObj = NewStk500Board(chrome.serial, 128);
     if (!boardObj.status.ok()) {
       log(kDebugError, "Couldn't create STK500 Board: " + boardObj.status.toString());
       return;
@@ -141,7 +141,8 @@ function uploadCompiledSketch(hexData, deviceName, protocol) {
     var board = boardObj.board;
 
     board.connect(deviceName, function(status) {
-      console.log("STK500 (beta) connect: " + status.toString());
+      log(kDebugNormal, "connected callback");
+//      log(kDebugNormal, "STK500 (beta) connect: " + status.toString());
     });
   } else if (protocol == "avr109") {
     // actually want tocheck that board is leonardo / micro / whatever
@@ -380,11 +381,11 @@ function stkDrainedBytes(readArg, connectionId) {
         setTimeout(function() {
           chrome.serial.setControlSignals(connectionId, {dtr: true, rts: true}, function(ok) {
             log(kDebugNormal, "sent dtr true, done: " + ok);
-            setTimeout(function() { stkDtrSent(ok, connectionId); }, 500);
+            setTimeout(function() { stkDtrSent(ok, connectionId); }, 10);
           });
-        }, 500);
+        }, 250);
       });
-    }, 500);
+    }, 250);
   }
 }
 

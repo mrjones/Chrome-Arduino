@@ -112,7 +112,7 @@ describe("AVR109 board", function() {
     board = r.board;
   });
 
-  xit("can't write until connected", function() {
+  it("can't write until connected", function() {
     runs(function() { board.writeFlash(
       0, genData(PAGE_SIZE), justRecordStatus); } );
 
@@ -122,7 +122,7 @@ describe("AVR109 board", function() {
     runs(function() { expect(status).toBeError(); } );
   });
 
-  xit("can't read until connected", function() {
+  it("can't read until connected", function() {
     var data;
 
     var recordStatusAndData = function(arg) {

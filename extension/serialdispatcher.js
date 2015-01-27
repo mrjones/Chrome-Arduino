@@ -11,7 +11,7 @@ function SerialDispatcher() {
 SerialDispatcher.prototype.listeners_ = [];
 
 SerialDispatcher.prototype.dispatch = function(readArg) {
-  log(kDebugFine, "SerialDispatcher::Dispatch to " + this.listeners_.length);
+//  log(kDebugFine, "SerialDispatcher::Dispatch to " + this.listeners_.length);
   for (var i = 0; i < this.listeners_.length; ++i) {
     // TODO(mrjones): It seems like we should compare
     // readArg.connectionId with listener.id here?

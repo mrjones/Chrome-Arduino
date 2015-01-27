@@ -11,35 +11,54 @@ describe("STK500 board", function() {
   }
 
   beforeEach(function() {
+    this.addMatchers(commonMatchers);
+//    console.log("=== " + currentSpec.getFullName() + " ===");
+
+
     fakeserial = new FakeSerial();
     notified = false;
 
-    var globalDispatcher = new SerialDispatcher();
-    fakeserial.onReceive.addListener(
-      globalDispatcher.dispatch.bind(globalDispatcher));
+    fakeserial.addHook(
+      new ExactMatcher([STK.GET_SYNC, STK.CRC_EOP]),
+      new ExactReply([STK.IN_SYNC, STK.OK]));
 
-    board = new Stk500Board(fakeserial, globalDispatcher);
+    fakeserial.addHook(
+      new ExactMatcher([STK.GET_PARAMETER, STK.HW_VER, STK.CRC_EOP]),
+      new ExactReply([STK.IN_SYNC, 2, STK.OK]));
+
+    board = new Stk500Board(fakeserial, 128);
   });
 
   it("can't write until connected", function() {
-    expect(board.writeFlash(0, [0x00, 0x01]).ok()).toBe(false);
+    runs(function() {
+      board.writeFlash(0, [0x00, 0x01], justRecordStatus);
+    });
+
+    waitsFor(function() {
+      return notified;
+    }, "Callback should have been called.", 1000);
+
+    runs(function() {
+      expect(status).toBeError();
+    });
   });
 
   it("can't read until connected", function() {
-    expect(board.readFlash(0).ok()).toBe(false);
+    expect(board.readFlash(0)).toBeOk);
   });
 
   it("connects", function() {
     runs(function() {
+      console.log("=== CONNECTS ===");
       board.connect("testDevice", justRecordStatus);
     });
 
     waitsFor(function() {
       return notified;
-    }, "Callback should have been called.", 100);
+    }, "Callback should have been called.", 5000);
 
     runs(function() {
-      expect(status.ok()).toBe(true);
+      expect(status).toBeOk();
 
       var signals = fakeserial.controlSignalHistory_;
       expect(signals.length).toBe(2);
@@ -49,22 +68,26 @@ describe("STK500 board", function() {
       expect(signals[1].signals["dtr"]).toBe(true);
       expect(signals[1].signals["rts"]).toBe(true);
 
+      
       // TODO: mrjones assert on timestamps of control signals?
     });
   });
 
   it("reports connection failure", function() {
     runs(function() {
+      console.log("=== CONNECTION FAILURE ===");
       fakeserial.setAllowConnections(false);
       board.connect("testDevice", justRecordStatus);
     });
 
     waitsFor(function() {
+      console.log("n: " + notified);
       return notified;
-    }, "Callback should have been called.", 100);
+    }, "Callback should have been called.", 5000);
 
     runs(function() {
-      expect(status.ok()).toBe(false);
+      console.log("pstlatch");
+      expect(status).toBeOk());
     });
   });
 });
