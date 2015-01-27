@@ -252,7 +252,7 @@ Stk500Board.prototype.twiddleControlLines_ = function(doneCb) {
           }
           log(kDebugFine, "STK500::DTR is true");
           console.log(doneCb);
-          board.getSync_(doneCb, 0);
+          setTimeout(function() { board.getSync_(doneCb, 0); }, 250);
         });
       }, 250);
     });
@@ -260,9 +260,8 @@ Stk500Board.prototype.twiddleControlLines_ = function(doneCb) {
 }
 
 Stk500Board.prototype.getSync_ = function(doneCb, attempts) {
-
-  log(kDebugFine, "STK500::GetSync");
-  console.log(doneCb);
+  log(kDebugFine, "STK500::GetSync " + attempts);
+  log(kDebugFine, doneCb);
   var board = this;
   this.writeAndGetReply_(
     [ STK.GET_SYNC, STK.CRC_EOP ],
