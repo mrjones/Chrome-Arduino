@@ -141,8 +141,14 @@ function uploadCompiledSketch(hexData, deviceName, protocol) {
     var board = boardObj.board;
 
     board.connect(deviceName, function(status) {
-      log(kDebugNormal, "connected callback");
-//      log(kDebugNormal, "STK500 (beta) connect: " + status.toString());
+      if (status.ok()) {
+        log(kDebugNormal, "STK500: connected.");
+        board.writeFlash(0, pad(hexData, 128), function(status) {
+          log(kDebugNormal, "STK programming status: " + status.toString());
+        });
+      } else {
+        log(kDebugNormal, "STK: connection error: " + status.toString());
+      }
     });
   } else if (protocol == "avr109") {
     // actually want tocheck that board is leonardo / micro / whatever
