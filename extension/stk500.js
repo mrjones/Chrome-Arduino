@@ -36,6 +36,7 @@ function NewStk500Board(serial, pageSize) {
 function Stk500Board(serial, pageSize) {
   this.serial_ = serial;
   this.pageSize_ = pageSize;
+  this.readHandler_ = this.discardData_;
 };
 
 Stk500Board.prototype.connect = function(deviceName, doneCb) {
@@ -106,8 +107,9 @@ Stk500Board.prototype.writeFlashImpl_ = function(boardAddress, data, doneCb) {
   log(kDebugNormal, "STK500::WriteFlash (" + data.length + " bytes)");
 
   var board = this;
-  this.writeAndGetReply_(
+  this.writeAndGetFixedSizeReply_(
     [STK.ENTER_PROGMODE, STK.CRC_EOP],
+    2,
     function(readArg) {
       var d = binToHex(readArg.data);
       if (d.length == 2 && d[0] == STK.IN_SYNC && d[1] == STK.OK) {
@@ -133,9 +135,10 @@ Stk500Board.prototype.writePageAddress_ = function(dataStart, data, pageNo, done
   var addressHi = (address & 0xFF00) >> 8;
 
   var board = this;
-  this.writeAndGetReply_(
+  this.writeAndGetFixedSizeReply_(
     [STK.LOAD_ADDRESS, addressHi, addressLo, STK.CRC_EOP],
-    this.waitForNBytes_(2, function(readArg) {
+    2,
+    function(readArg) {
       var d = binToHex(readArg.data);
       if (d.length == 2 && d[0] == STK.IN_SYNC && d[1] == STK.OK) {
         board.writePageData_(dataStart, data, pageNo, doneCb);
@@ -143,7 +146,7 @@ Stk500Board.prototype.writePageAddress_ = function(dataStart, data, pageNo, done
         doneCb(Status.Error(
           "Error loading address for page #" + pageNo + ": " + data));
       }
-    }));
+    });
 }
 
 Stk500Board.prototype.writePageData_ = function(dataStart, data, pageNo, doneCb) {
@@ -162,9 +165,10 @@ Stk500Board.prototype.writePageData_ = function(dataStart, data, pageNo, doneCb)
   log(kDebugNormal, "STK500::Writing data.");
 
   var board = this;
-  this.writeAndGetReply_(
+  this.writeAndGetFixedSizeReply_(
     message,
-    this.waitForNBytes_(2, function(readArg) {
+    2,
+    function(readArg) {
       var d = binToHex(readArg.data);
       if (d.length == 2 && d[0] == STK.IN_SYNC && d[1] == STK.OK) {
         if (relativeOffset + board.pageSize_ >= data.length) {
@@ -177,7 +181,7 @@ Stk500Board.prototype.writePageData_ = function(dataStart, data, pageNo, doneCb)
           "Error flashing page #" + pageNo + ": " + data));
         return;
       }
-    }));
+    });
 }
 
 Stk500Board.prototype.doneWriting_ = function(doneCb) {
@@ -208,9 +212,9 @@ Stk500Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   this.twiddleControlLines_(doneCb);
 }
 
-Stk500Board.prototype.writeAndGetReply_ = function(writePayload, readHandler) {  
-  log(kDebugFine, "STK500::WriteAndGetReply");
-  this.setReadHandler_(readHandler);
+Stk500Board.prototype.writeAndGetFixedSizeReply_ = function(writePayload, replyBytes, readHandler) {  
+  log(kDebugFine, "STK500::WriteAndGetFixedSizeReply");
+  this.setReadHandler_(this.waitForNBytes_(replyBytes, readHandler));
   this.write_(writePayload);
 };
 
@@ -269,10 +273,10 @@ Stk500Board.prototype.twiddleControlLines_ = function(doneCb) {
 Stk500Board.prototype.getSync_ = function(doneCb, attempts) {
   log(kDebugFine, "STK500::GetSync " + attempts);
   var board = this;
-  this.writeAndGetReply_(
+  this.writeAndGetFixedSizeReply_(
     [ STK.GET_SYNC, STK.CRC_EOP ],
-    this.waitForNBytes_(2, function(readArg) {
-//    function(readArg) {
+    2,
+    function(readArg) {
       var data = binToHex(readArg.data);
       if (data.length == 2 &&
           data[0] == STK.IN_SYNC && data[1] == STK.OK) {
@@ -288,14 +292,15 @@ Stk500Board.prototype.getSync_ = function(doneCb, attempts) {
           log(kDebugError, "Couldn't get sync");
         }
       }
-    }));
+    });
 }
 
 Stk500Board.prototype.validateVersion_ = function(doneCb) {
   var board = this;
   
-  this.writeAndGetReply_(
+  this.writeAndGetFixedSizeReply_(
     [STK.GET_PARAMETER, STK.HW_VER, STK.CRC_EOP],
+    3,
     function(readArg) {
       log(kDebugNormal, "Hardware version: " + binToHex(readArg.data));
       board.state_ = Stk500Board.State.CONNECTED;
@@ -303,7 +308,6 @@ Stk500Board.prototype.validateVersion_ = function(doneCb) {
     });
 }
 
-// TODO(mrjones): this is pretty awful
 Stk500Board.prototype.waitForNBytes_ = function(n, onFull) {
   var buffer = [];
 
@@ -315,7 +319,16 @@ Stk500Board.prototype.waitForNBytes_ = function(n, onFull) {
         buffer.length + ", and waiting for " + n);
     if (buffer.length >= n) {
       log(kDebugFine, "Buffer full!");
+ 
+      // If any data comes in while we're not expecting it, just drop
+      // it on the floor.
+      this.readHandler_ = this.discardData_;
       onFull({data: buffer});
     }
   }
+}
+
+Stk500Board.prototype.discardData_ = function(readArg) {
+  log(kDebugError, "STK500::Got data from board when none was expected: " +
+      binToHex(readArg));
 }
