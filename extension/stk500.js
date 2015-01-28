@@ -1,9 +1,36 @@
-// Board API (in progress):
 //
-// Connect
-// ReadFlash
-// WriteFlash
+// API
+//
+function NewStk500Board(serial, pageSize) {
+  if (typeof(serial) === "undefined") {
+    return { status: Status.Error("serial is undefined") }
+  }
 
+  if (typeof(pageSize) === "undefined") {
+    return { status: Status.Error("pageSize is undefined") }
+  }
+
+  return { status: Status.OK, board: new Stk500Board(serial, pageSize) }
+}
+
+Stk500Board.prototype.connect = function(deviceName, doneCb) {
+  this.connectImpl_(deviceName, doneCb);
+};
+
+Stk500Board.prototype.writeFlash = function(boardAddress, data, doneCb) {
+  this.writeFlashImpl_(boardAddress, data, doneCb);
+};
+
+Stk500Board.prototype.readFlash = function(boardAddress) {
+  if (this.state_ != Stk500Board.State.CONNECTED) {
+    return Status.Error("Not connected to board: " + this.state_);
+  }
+
+  log(kDebugError, "Not implemented");
+};
+//
+// IMPLEMENTATION
+//
 var STK = {
   OK: 0x10,
   IN_SYNC: 0x14,
@@ -20,18 +47,17 @@ var STK = {
   SW_VER_MINOR: 0x82,
 };
 
-// API
-function NewStk500Board(serial, pageSize) {
-  if (typeof(serial) === "undefined") {
-    return { status: Status.Error("serial is undefined") }
-  }
+Stk500Board.State = {
+  DISCONNECTED: "disconnected",
+  CONNECTING: "connecting",
+  CONNECTED: "connected"
+};
 
-  if (typeof(pageSize) === "undefined") {
-    return { status: Status.Error("pageSize is undefined") }
-  }
-
-  return { status: Status.OK, board: new Stk500Board(serial, pageSize) }
-}
+Stk500Board.prototype.connectionId_ = -1;
+Stk500Board.prototype.pageSize_ = -1;
+Stk500Board.prototype.readHandler_ = null;
+Stk500Board.prototype.serial_ = null;
+Stk500Board.prototype.state_ = Stk500Board.State.DISCONNECTED;
 
 function Stk500Board(serial, pageSize) {
   this.serial_ = serial;
@@ -39,7 +65,7 @@ function Stk500Board(serial, pageSize) {
   this.readHandler_ = this.discardData_;
 };
 
-Stk500Board.prototype.connect = function(deviceName, doneCb) {
+Stk500Board.prototype.connectImpl_ = function(deviceName, doneCb) {
   // TODO: Validate doneCb
   // TODO: Validate deviceName?
   if (this.state_ != Stk500Board.State.DISCONNECTED) {
@@ -56,32 +82,7 @@ Stk500Board.prototype.connect = function(deviceName, doneCb) {
   this.serial_.connect(deviceName, { bitrate: 115200 }, function(connectArg) {
     board.serialConnected_(connectArg, doneCb);
   });
-};
-
-Stk500Board.prototype.writeFlash = function(boardAddress, data, doneCb) {
-  this.writeFlashImpl_(boardAddress, data, doneCb);
-};
-
-Stk500Board.prototype.readFlash = function(boardAddress) {
-  if (this.state_ != Stk500Board.State.CONNECTED) {
-    return Status.Error("Not connected to board: " + this.state_);
-  }
-
-  log(kDebugError, "Not implemented");
-};
-
-// IMPLEMENTATION
-Stk500Board.State = {
-  DISCONNECTED: "disconnected",
-  CONNECTING: "connecting",
-  CONNECTED: "connected"
-};
-
-Stk500Board.prototype.connectionId_ = -1;
-Stk500Board.prototype.pageSize_ = -1;
-Stk500Board.prototype.readHandler_ = null;
-Stk500Board.prototype.serial_ = null;
-Stk500Board.prototype.state_ = Stk500Board.State.DISCONNECTED;
+}
 
 Stk500Board.prototype.writeFlashImpl_ = function(boardAddress, data, doneCb) {
   if (this.state_ != Stk500Board.State.CONNECTED) {
