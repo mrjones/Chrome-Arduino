@@ -289,7 +289,7 @@ Stk500Board.prototype.getSync_ = function(doneCb, attempts) {
             board.getSync_(doneCb, attempts + 1);
           }, 50);
         } else {
-          // todo: call doneCb with the error
+          // TODO(mrjones): call doneCb with the error
           log(kDebugError, "Couldn't get sync");
         }
       }
@@ -299,6 +299,8 @@ Stk500Board.prototype.getSync_ = function(doneCb, attempts) {
 Stk500Board.prototype.validateVersion_ = function(doneCb) {
   var board = this;
   
+  // TODO(mrjones): Think about what to do here ... do we actually care
+  // about HW/SW versions?
   this.writeAndGetFixedSizeReply_(
     [STK.GET_PARAMETER, STK.HW_VER, STK.CRC_EOP],
     3,
@@ -309,6 +311,8 @@ Stk500Board.prototype.validateVersion_ = function(doneCb) {
     });
 }
 
+// TODO(mrjones): set a watchdog timeout, so that we can return
+// something, rather than hanging forever if we don't get n bytes.
 Stk500Board.prototype.waitForNBytes_ = function(n, onFull) {
   var buffer = [];
 
