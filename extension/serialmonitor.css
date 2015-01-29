@@ -17,7 +17,7 @@ body {
 }
 
 #serialmonitor.section {
-  height: 278px;
+  height: 208px;
 }
 
 #status.section {
@@ -25,7 +25,7 @@ body {
 }
 
 #fromdevice_data {
-  height: 246px;
+  height: 146px;
   width: auto;
   clear: both;
   border: 1px solid #999999;
