@@ -1,9 +1,10 @@
 var kDebugError = 0;
 var kDebugNormal = 1;
 var kDebugFine = 2;
+var kDebugVeryFine = 3;
 
-var visibleLevel = kDebugFine;
-var consoleLevel = kDebugFine;
+var visibleLevel = kDebugNormal;
+var consoleLevel = kDebugVeryFine;
 
 var visibleLoggingDiv_ = "";
 
