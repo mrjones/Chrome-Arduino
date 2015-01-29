@@ -8,8 +8,12 @@ body {
   border-top: 2px solid teal;
 }
 
-#config.section {
-  height: 78px;
+.section .label {
+  font-weight: bold;
+}
+
+#sketch_url {
+  width: 70%;
 }
 
 #serialmonitor.section {

@@ -12,7 +12,8 @@ var ids = {
   sendText: "todevice_data",
   sendButton: "todevice_send",
   statusText: "status",
-  uploaderButton: "uploader_button"
+  uploaderButton: "uploader_button",
+  logLevelMenu: "log_level_picker"
 };
 
 configureVisibleLogging(ids.statusText);
@@ -34,27 +35,41 @@ document.getElementById(ids.sendText)
   .addEventListener('keydown', doOnEnter(sendDataToDevice));
 
 document.getElementById(ids.uploaderButton)
-  .addEventListener('click', testUploader);
+  .addEventListener('click', uploadButtonPressed);
 
-document.getElementById("test_fetch")
-  .addEventListener('click', testFetch);
+document.getElementById(ids.logLevelMenu)
+  .addEventListener('change', logLevelChanged);
+
+//document.getElementById("test_fetch")
+//  .addEventListener('click', testFetch);
 
 document.getElementById(ids.disconnectButton).disabled = true;
 document.getElementById(ids.sendButton).disabled = true;
 
-function testFetch() {
-    fetchProgram("http://linode.mrjon.es/blink.hex", function(data) {
-        log(kDebugFine, "Got data!");
-    });
+//function testFetch() {
+//    fetchProgram("http://linode.mrjon.es/blink.hex", function(data) {
+//        log(kDebugFine, "Got data!");
+//    });
+//}
+
+function logLevelChanged() {
+  var logLevelMenu = document.getElementById(ids.logLevelMenu);
+  var logLevel = logLevelMenu.options[logLevelMenu.selectedIndex].value;
+
+  visibleLevel = logLevel;
 }
 
-function testUploader() {
+function uploadButtonPressed() {
   var portMenu = document.getElementById("devices_menu");
   var selectedPort = portMenu.options[portMenu.selectedIndex].text;
 
   var protocolMenu = document.getElementById("protocol");
   var protocol = protocolMenu.options[protocolMenu.selectedIndex].value;
-  uploadBlinkSketch(selectedPort, protocol);
+
+  var urlBox = document.getElementById("sketch_url");
+  var url = urlBox.value;
+
+  uploadSketch(selectedPort, protocol, url);
 }
 
 function doOnEnter(targetFunction) {
@@ -66,6 +81,7 @@ function doOnEnter(targetFunction) {
 }
 
 function detectDevices() {
+  var foundUsb = false;
   var menu = document.getElementById("devices_menu");
   menu.options.length = 0;
   chrome.serial.getDevices(function(devices) {
@@ -73,6 +89,10 @@ function detectDevices() {
       log(kDebugFine, devices[i].path);
       var portOpt = document.createElement("option");
       portOpt.text = devices[i].path;
+      if (!foundUsb && devices[i].path.indexOf("tty.usb") > -1) {
+        foundUsb = true;
+        portOpt.selected = true;
+      }
       menu.add(portOpt, null);
     }
   });

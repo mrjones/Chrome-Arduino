@@ -81,9 +81,9 @@ function readFromBuffer(connectionId, maxBytes, callback) {
 }
 
 // TODO: board and prototocol should be separate variables
-function uploadBlinkSketch(deviceName, protocol) {
-  log(kDebugFine, "uploading blink sketch");
-  var hexfile = 'http://linode.mrjon.es/blink.hex';
+function uploadSketch(deviceName, protocol, sketchUrl) {
+  log(kDebugNormal, "Uploading blink sketch from: " + sketchUrl);
+  var hexfile = sketchUrl;
   if (protocol == 'avr109' || protocol == 'avr109_beta') {
     //
     hexfile = 'http://linode.mrjon.es/blink-micro.hex?bustcache=' + (new Date().getTime());
