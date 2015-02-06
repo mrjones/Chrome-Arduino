@@ -1,0 +1,52 @@
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="serialmonitor.css">
+  </head>
+  <body>
+
+    <div id="common_config" class="section">
+      <div id="devices">
+        <div class="label">Serial Port</div>
+        <select id="devices_menu"></select>
+        <button id="devices_refresh">Refresh Port List</button>
+      </div>
+    </div>
+
+    <div id="uploader_config" class="section">
+      <div class="label">Sketch uploader (v2)</div>
+      <div>
+        <label for="sketch_url">Sketch URL</label>
+        <input type="text" id="sketch_url" value="http://linode.mrjon.es/blink.hex"/>
+      </div>
+      <select id="protocol">
+        <option value="stk500">STK500</option>
+        <option value="stk500_beta">STK500 (beta)</option>
+        <option value="avr109">AVR109</option>
+        <option selected value="avr109_beta">AVR109 (Beta)</option>
+      </select>
+      <button id="uploader_button">Upload</button>
+    </div>
+
+    <div id="logging_config" class="section">
+      <div class="label">Logging level</div>
+      <select id="log_level_picker">
+        <option value="0">Errors only</option>
+        <option value="1" selected>Normal</option>
+        <option value="2">Debugging</option>
+        <option value="3">Verbose debugging</option>
+      </select>
+    </div>
+    
+    <div id="serialmonitor" class="section">
+      <div class="label">Serial monitor</div>
+      <button id="connect">Connect</button>
+      <button id="disconnect">Disconnect</button>
+      <div id="fromdevice_data"></div>
+      <input id="todevice_data" type="text">
+      <button id="todevice_send">Send</button>
+    </div>
+
+    <div id="status" class="section"></div>
+    <script src="js/module.js"></script>
+  </body>
+</html>

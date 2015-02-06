@@ -1,0 +1,17 @@
+{
+  "name": "Arduino Extension",
+  "version": "0.2",
+  "manifest_version": 2,
+  "description": "A Chrome Extension",
+  "app": {
+    "background": {
+      "scripts": [ "launcher.js" ]
+    }
+  },
+  "permissions": [
+    "extension",
+    "serial",
+    "usb",
+    "http://*/"
+  ]
+}
