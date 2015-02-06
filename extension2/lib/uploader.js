@@ -79,13 +79,12 @@ function readFromBuffer(connectionId, maxBytes, callback) {
 // TODO: board and prototocol should be separate variables
 function uploadSketch(deviceName, protocol, sketchUrl) {
   log(kDebugNormal, "Uploading blink sketch from: " + sketchUrl);
-  var hexfile = sketchUrl;
-  if (protocol == 'avr109' || protocol == 'avr109_beta') {
-    //
-    hexfile = 'http://linode.mrjon.es/blink-micro.hex?bustcache=' + (new Date().getTime());
-  }
+//  var hexfile = sketchUrl;
+//  if (protocol == 'avr109') {
+//    hexfile = 'http://linode.mrjon.es/blink-micro.hex?bustcache=' + (new Date().getTime());
+//  }
 
-  fetchProgram(hexfile, function(programBytes) { 
+  fetchProgram(sketchUrl, function(programBytes) { 
     log(kDebugFine, "Fetched program. Uploading to: " + deviceName);
     log(kDebugFine, "Protocol: " + protocol);
     uploadCompiledSketch(programBytes, deviceName, protocol);
@@ -123,7 +122,7 @@ function pad(data, pageSize) {
 function uploadCompiledSketch(hexData, deviceName, protocol) {
   sketchData_ = hexData;
   inSync_ = false;
-  if (protocol == "stk500_beta") {
+  if (protocol == "stk500") {
     var boardObj = stk500.NewStk500Board(chrome.serial, 128);
     if (!boardObj.status.ok()) {
       log(kDebugError, "Couldn't create STK500 Board: " + boardObj.status.toString());
@@ -141,7 +140,7 @@ function uploadCompiledSketch(hexData, deviceName, protocol) {
         log(kDebugNormal, "STK: connection error: " + status.toString());
       }
     });
-  } else if (protocol == "avr109_beta") {
+  } else if (protocol == "avr109") {
     var boardObj = avr109.NewAvr109Board(chrome.serial, 128, globalDispatcher);
     if (!boardObj.status.ok()) {
       log(kDebugError, "Couldn't create AVR109 Board: " + boardObj.status.toString());
@@ -150,9 +149,9 @@ function uploadCompiledSketch(hexData, deviceName, protocol) {
     var board = boardObj.board;
     board.connect(deviceName, function(status) {
       if (status.ok()) {
+        log(kDebugNormal, "AVR109 Connected. Writing flash!");
         board.writeFlash(0, pad(hexData, 128), function(status) {
           log(kDebugNormal, "AVR programming status: " + status.toString());
-
         });
       } else {
         log(kDebugNormal, "AVR connection error: " + status.toString());

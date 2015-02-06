@@ -5,6 +5,8 @@ var binary = require("./binary.js");
 
 var hexToBin = binary.hexToBin;
 var binToHex = binary.binToHex;
+var storeAsTwoBytes = binary.storeAsTwoBytes;
+
 var log = logging.log;
 var kDebugError = logging.kDebugError;
 var kDebugNormal = logging.kDebugNormal;
@@ -74,7 +76,7 @@ Avr109Board.prototype.writeFlash = function(boardAddress, data, doneCb) {
         + (data.length % this.pageSize_) + ")"));
   }
 
-
+  console.log(kDebugFine, "Entering program mode");
   var board = this;
   this.writeAndGetReply_(
     [AVR.ENTER_PROGRAM_MODE],
@@ -106,6 +108,18 @@ Avr109Board.State = {
   CONNECTED: "connected"
 };
 
+var AVR = {
+  SOFTWARE_VERSION: 0x56,
+  ENTER_PROGRAM_MODE: 0x50,
+  LEAVE_PROGRAM_MODE: 0x4c,
+  SET_ADDRESS: 0x41,
+  WRITE: 0x42, // TODO: WRITE_PAGE
+  TYPE_FLASH: 0x46,
+  EXIT_BOOTLOADER: 0x45,
+  CR: 0x0D,
+  READ_PAGE: 0x67,
+};
+
 Avr109Board.prototype.globalDispatcher_ = null;
 Avr109Board.prototype.pageSize_ = -1;
 Avr109Board.prototype.serial_ = null;
@@ -118,6 +132,7 @@ Avr109Board.MAGIC_BITRATE = 1200;
 
 Avr109Board.prototype.readDispatcher_ = function(readArg) {
   if (this.readHandler_ != null) {
+    log(kDebugFine, "Dispatching read...");
     this.readHandler_(readArg);
     return;
   }
@@ -133,9 +148,9 @@ Avr109Board.prototype.kickBootloader_ = function(originalDeviceName, doneCb) {
   serial.getDevices(function(devicesArg) {
     oldDevices = devicesArg;
     serial.connect(originalDeviceName, {bitrate: Avr109Board.MAGIC_BITRATE }, function(connectArg) {
-      // TODO: validate connect arg
+      log(kDebugFine, "CONNECT: " + JSON.stringify(connectArg));
       serial.disconnect(connectArg.connectionId, function(disconnectArg) {
-        // TODO: validate disconnect arg
+        log(kDebugFine, "DISCONNECT: " + JSON.stringify(disconnectArg));
         board.waitForNewDevice_(
           oldDevices, doneCb, board.clock_.nowMillis() + 10 * 1000);
 //          oldDevices, doneCb, board.clock_.nowMillis() + 1000);
@@ -189,7 +204,9 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
       log(kDebugNormal, "Aha! Connecting to: " + appeared[0]);
       // I'm not 100% sure why we need this setTimeout
       setTimeout(function() {
+        log(kDebugFine, "Reconnecting...");
         serial.connect(appeared[0], { bitrate: 57600 }, function(connectArg) {
+          
           board.serialConnected_(connectArg, doneCb);
         });
       }, 500);
@@ -198,6 +215,7 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
 }
 
 Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
+  log(kDebugFine, "serialConnected");
   // TODO: test this?
   if (typeof(connectArg) == "undefined" ||
       typeof(connectArg.connectionId) == "undefined" ||
@@ -217,6 +235,7 @@ Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
 }
 
 Avr109Board.prototype.writeAndGetReply_ = function(payload, handler) {  
+  log(kDebugFine, "writeAndGetReply");
   this.setReadHandler_(handler);
   this.write_(payload);
 };
@@ -224,16 +243,19 @@ Avr109Board.prototype.writeAndGetReply_ = function(payload, handler) {
 Avr109Board.prototype.write_ = function(payload) {
   this.serial_.send(
     this.connectionId_, hexToBin(payload), function(writeArg) {
+      log(kDebugFine, "did write: " + JSON.stringify(writeArg));
       // TODO: veridy writeArg
     });
 }
 
 
 Avr109Board.prototype.setReadHandler_ = function(handler) {
+  log(kDebugFine, "setReadHandler");
   this.readHandler_ = handler;
 };
 
 Avr109Board.prototype.startCheckSoftwareVersion_ = function(doneCb) {
+  log(kDebugFine, "startCheckSoftwareVersion");
   var board = this;
   this.writeAndGetReply_(
     [ AVR.SOFTWARE_VERSION ],
@@ -243,12 +265,15 @@ Avr109Board.prototype.startCheckSoftwareVersion_ = function(doneCb) {
 }
 
 Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
+  log(kDebugFine, "finishCheckSoftwareVersion");
   var hexData = binToHex(readArg.data);
-  // TODO: actuall examine response
+  // TODO: actually examine response
   if (hexData.length == 2) {
     this.state_ = Avr109Board.State.CONNECTED;
+    log(kDebugNormal, "Connected");
     doneCb(Status.OK);
   } else {
+    log(kDebugError, "Connection error.");
     doneCb(Status.Error("Unexpected software version response: " + hexRep(hexData)));
   }
 
@@ -257,6 +282,7 @@ Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
 
 
 Avr109Board.prototype.beginProgramming_ = function(boardAddress, data, doneCb) {
+  console.log(kDebugFine, "Begin programming.");
   var board = this;
   var addressBytes = storeAsTwoBytes(boardAddress);
   this.writeAndGetReply_(
@@ -273,6 +299,7 @@ Avr109Board.prototype.beginProgramming_ = function(boardAddress, data, doneCb) {
 }
 
 Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
+  console.log(kDebugFine, "Write page");
   var numPages = data.length / this.pageSize_;
   if (pageNo == 0 || pageNo == numPages - 1 || (pageNo + 1) % 5 == 0) {
     log(kDebugFine, "Writing page " + (pageNo + 1) + " of " + numPages);
