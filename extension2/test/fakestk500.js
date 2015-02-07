@@ -5,9 +5,9 @@ var FakeStk500 = function(memorySize) {
   this.onReceive.addListener = this.addListenerImpl_.bind(this);
   this.onReceive.removeListener = this.removeListenerImpl_.bind(this);
 
-  this.nextConnectionId_ = 10;
   this.reset_();
 
+  this.nextConnectionId_ = 10;
   this.memory_ = new Array(memorySize);
   for (var i = 0; i < memorySize; i++) {
     // Write random data to the board

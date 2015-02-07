@@ -66,15 +66,18 @@ Stk500Board.State = {
   CONNECTED: "connected"
 };
 
-Stk500Board.prototype.connectionId_ = -1;
-Stk500Board.prototype.pageSize_ = -1;
-Stk500Board.prototype.readHandler_ = null;
-Stk500Board.prototype.serial_ = null;
-Stk500Board.prototype.serialListener_ = null;
-Stk500Board.prototype.state_ = Stk500Board.State.DISCONNECTED;
-Stk500Board.prototype.connectionDelayMs_ = 2000;
+Stk500Board.prototype.init_ = function() {
+  this.connectionId_ = -1;
+  this.pageSize_ = -1;
+  this.readHandler_ = null;
+  this.serial_ = null;
+  this.serialListener_ = null;
+  this.state_ = Stk500Board.State.DISCONNECTED;
+  this.connectionDelayMs_ = 2000;
+}
 
 function Stk500Board(serial, pageSize, opt_options) {
+  this.init_();
   this.serial_ = serial;
   this.pageSize_ = pageSize;
   this.readHandler_ = this.discardData_;
