@@ -113,7 +113,7 @@ Stk500Board.prototype.write_ = function(payload) {
   log(kDebugFine, "STK500::Writing " + hexRep(payload.slice(0,10)) + " -> " + this.connectionId_);
   this.serial_.send(
     this.connectionId_, hexToBin(payload), function(writeArg) {
-      log(kDebugVeryFine, "WRITE: " + JSON.stringify(writeArg));
+      // log(kDebugVeryFine, "WRITE: " + JSON.stringify(writeArg));
       // TODO: veridy writeArg
     });
 }

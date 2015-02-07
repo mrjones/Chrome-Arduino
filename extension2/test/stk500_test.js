@@ -14,6 +14,13 @@ var genPayload = function(length) {
 }
 
 describe("stk500", function() {
+  var kPageSize = 128;
+  var fake = null;
+
+  beforeEach(function() {
+    fake = new FakeStk500(kPageSize * 10);
+  });
+
   it("doesn't write until connected", function(done) {
     var result = stk500.NewStk500Board(null, 1024);
     assert.equal(true, result.status.ok(), result.status.toString());
@@ -25,9 +32,7 @@ describe("stk500", function() {
   });
 
   it("connects", function(done) {
-    var fake = new FakeStk500();
-    var result = stk500.NewStk500Board(fake, 128, {connectDelayMs: 10});
-
+    var result = stk500.NewStk500Board(fake, kPageSize, {connectDelayMs: 10});
     assert.equal(true, result.status.ok(), result.status.toString());
 
     result.board.connect("devicename", function(connectStatus) {
@@ -37,10 +42,8 @@ describe("stk500", function() {
   });
 
   it("writesFlash", function(done) {
-    var fake = new FakeStk500(2048);
-    var result = stk500.NewStk500Board(fake, 128, {connectDelayMs: 10});
-    var kPayloadSize = 1024;
-
+    var result = stk500.NewStk500Board(fake, kPageSize, {connectDelayMs: 10});
+    var kPayloadSize = kPageSize * 4;
     assert.equal(true, result.status.ok(), result.status.toString());
 
     result.board.connect("devicename", function(connectStatus) {
@@ -62,4 +65,37 @@ describe("stk500", function() {
       });
     });
   });
+
+  it("writesMustBeAligned_start", function(done) {
+    var result = stk500.NewStk500Board(fake, kPageSize, {connectDelayMs: 10});
+    var kPayloadSize = kPageSize;
+    assert.equal(true, result.status.ok(), result.status.toString());
+
+    result.board.connect("devicename", function(connectStatus) {
+      assert.equal(true, connectStatus.ok(), connectStatus.toString());
+
+      result.board.writeFlash(1, genPayload(kPayloadSize), function(writeStatus) {
+        assert.equal(false, writeStatus.ok(), writeStatus.toString());
+
+        done();
+      });
+    });
+  });
+
+  it("writesMustBeAligned_length", function(done) {
+    var result = stk500.NewStk500Board(fake, kPageSize, {connectDelayMs: 10});
+    var kPayloadSize = kPageSize + 1;
+    assert.equal(true, result.status.ok(), result.status.toString());
+
+    result.board.connect("devicename", function(connectStatus) {
+      assert.equal(true, connectStatus.ok(), connectStatus.toString());
+
+      result.board.writeFlash(0, genPayload(kPayloadSize), function(writeStatus) {
+        assert.equal(false, writeStatus.ok(), writeStatus.toString());
+
+        done();
+      });
+    });
+  });
+
 });
