@@ -3,6 +3,7 @@ var logging = require("./logging.js");
 var binary = require("./binary.js");
 
 var hexToBin = binary.hexToBin;
+var hexRep = binary.hexRep;
 var binToHex = binary.binToHex;
 var log = logging.log;
 var kDebugError = logging.kDebugError;
@@ -55,6 +56,8 @@ var STK = {
   HW_VER: 0x80,
   SW_VER_MAJOR: 0x81,
   SW_VER_MINOR: 0x82,
+  
+  BYTES_PER_WORD: 2,
 };
 
 Stk500Board.State = {
@@ -89,7 +92,7 @@ Stk500Board.prototype.setReadHandler_ = function(handler) {
 };
 
 Stk500Board.prototype.handleRead_ = function(readArg) {
-  log(kDebugFine, "STK500::HandleRead: [" + binToHex(readArg.data).slice(0,10) + "]");
+  log(kDebugFine, "STK500::HandleRead: " + hexRep(binToHex(readArg.data).slice(0,10)));
   if (this.readHandler_ != null) {
     this.readHandler_(readArg);
     return;
@@ -99,7 +102,7 @@ Stk500Board.prototype.handleRead_ = function(readArg) {
 }
 
 Stk500Board.prototype.write_ = function(payload) {
-  log(kDebugFine, "STK500::Writing [" + payload.slice(0,10) + "] -> " + this.connectionId_);
+  log(kDebugFine, "STK500::Writing " + hexRep(payload.slice(0,10)) + " -> " + this.connectionId_);
   this.serial_.send(
     this.connectionId_, hexToBin(payload), function(writeArg) {
       log(kDebugVeryFine, "WRITE: " + JSON.stringify(writeArg));
@@ -266,6 +269,8 @@ Stk500Board.prototype.writeFlashImpl_ = function(boardAddress, data, doneCb) {
         + (data.length % this.pageSize_) + ")"));
   }
 
+  log(kDebugFine, hexRep(data))
+
   log(kDebugFine, "STK500::WriteFlash (" + data.length + " bytes)");
 
   var board = this;
@@ -290,14 +295,15 @@ Stk500Board.prototype.writePage_ = function(dataStart, data, pageNo, doneCb) {
 
 Stk500Board.prototype.writePageAddress_ = function(dataStart, data, pageNo, doneCb) {
   log(kDebugFine, "-- STK500::LoadAddress " + pageNo);
-  var address = dataStart + (this.pageSize_ * pageNo);
+  var byteAddress = dataStart + (this.pageSize_ * pageNo);
 
-  var addressLo = address & 0x00FF;
-  var addressHi = (address & 0xFF00) >> 8;
+  var wordAddress = byteAddress / STK.BYTES_PER_WORD;
+  var addressLo = wordAddress & 0x00FF;
+  var addressHi = (wordAddress & 0xFF00) >> 8;
 
   var board = this;
   this.writeAndGetFixedSizeReply_(
-    [STK.LOAD_ADDRESS, addressHi, addressLo, STK.CRC_EOP],
+    [STK.LOAD_ADDRESS, addressLo, addressHi, STK.CRC_EOP],
     2,
     function(readArg) {
       var d = binToHex(readArg.data);
@@ -343,8 +349,23 @@ Stk500Board.prototype.writePageData_ = function(dataStart, data, pageNo, doneCb)
 }
 
 Stk500Board.prototype.doneWriting_ = function(doneCb) {
-  this.readHandler_ = null
-  doneCb(Status.OK);
+  var board = this;
+  log(kDebugFine, "STK500::Leaving progmode")
+  this.writeAndGetFixedSizeReply_(
+    [ STK.LEAVE_PROGMODE, STK.CRC_EOP ],
+    2,
+    function(readArg) {
+      //  this.serial_.onReceive.removeListener(this.handleRead_.bind(this))
+      log(kDebugFine, "STK500::Disconnecting")
+      board.serial_.disconnect(board.connectionId_, function(disconnectArg) {
+        log(kDebugFine, "STK500::Disconnected")
+        board.connectionId_ = -1;
+        board.state_ = Stk500Board.State.DISCONNECTED; 
+        board.readHandler_ = null
+
+        doneCb(Status.OK);
+      });
+    });
 }
 
 //

@@ -17,6 +17,19 @@ function hexToBin(hex) {
   return buffer;
 }
 
+function hexRep(intArray) {
+  var buf = "[";
+  var sep = "";
+  for (var i = 0; i < intArray.length; ++i) {
+    var h = intArray[i].toString(16);
+    if (h.length == 1) { h = "0" + h; }
+    buf += (sep + "0x" + h);
+    sep = ",";
+  }
+  buf += "]";
+  return buf;
+}
+
 function storeAsTwoBytes(n) {
   var lo = (n & 0x00FF);
   var hi = (n & 0xFF00) >> 8;
@@ -25,4 +38,5 @@ function storeAsTwoBytes(n) {
 
 exports.binToHex = binToHex;
 exports.hexToBin = hexToBin;
+exports.hexRep = hexRep;
 exports.storeAsTwoBytes = storeAsTwoBytes;

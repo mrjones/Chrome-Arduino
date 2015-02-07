@@ -78,13 +78,14 @@ function readFromBuffer(connectionId, maxBytes, callback) {
 
 // TODO: board and prototocol should be separate variables
 function uploadSketch(deviceName, protocol, sketchUrl) {
-  log(kDebugNormal, "Uploading blink sketch from: " + sketchUrl);
+  var u2 = sketchUrl + "?bustcache=" + (new Date().getTime());
+  log(kDebugNormal, "Uploading blink sketch from: " + u2);
 //  var hexfile = sketchUrl;
 //  if (protocol == 'avr109') {
 //    hexfile = 'http://linode.mrjon.es/blink-micro.hex?bustcache=' + (new Date().getTime());
 //  }
 
-  fetchProgram(sketchUrl, function(programBytes) { 
+  fetchProgram(u2, function(programBytes) { 
     log(kDebugFine, "Fetched program. Uploading to: " + deviceName);
     log(kDebugFine, "Protocol: " + protocol);
     uploadCompiledSketch(programBytes, deviceName, protocol);
@@ -98,7 +99,8 @@ function fetchProgram(url, handler) {
     if (xhr.readyState == 4) {
       if (xhr.status == 200) {
         var programBytes = ParseHexFile(xhr.responseText);
-        log(kDebugFine, "Program Data: " + xhr.responseText.substring(0,25) + "...");
+        log(kDebugFine, "Fetched Data: " + xhr.responseText);
+//        log(kDebugFine, "Program Data: " + xhr.responseText.substring(0,25) + "...");
         handler(programBytes);
       } else {
         log(kDebugError, "Bad fetch: " + xhr.status);
@@ -109,9 +111,6 @@ function fetchProgram(url, handler) {
   xhr.send();
 }
 
-var sketchData_;
-var inSync_ = false;
-
 function pad(data, pageSize) {
   while (data.length % pageSize != 0) {
     data.push(0);
@@ -120,8 +119,6 @@ function pad(data, pageSize) {
 }
 
 function uploadCompiledSketch(hexData, deviceName, protocol) {
-  sketchData_ = hexData;
-  inSync_ = false;
   if (protocol == "stk500") {
     var boardObj = stk500.NewStk500Board(chrome.serial, 128);
     if (!boardObj.status.ok()) {
