@@ -42,7 +42,7 @@ describe("stk500", function() {
     });
   });
 
-  it("writesFlash", function(done) {
+  it("writes and reads back flash", function(done) {
     var result = stk500.NewStk500Board(fake, kPageSize, {connectDelayMs: 10});
     var kPayloadSize = kPageSize * 4;
     assert.equal(true, result.status.ok(), result.status.toString());
@@ -62,7 +62,21 @@ describe("stk500", function() {
               payloadPattern[i % payloadPattern.length] + ", Actual: " + fake.memory_[i]);
         }
 
-        done();
+        result.board.connect("devicename", function(connectStatus) {
+          assert.equal(true, connectStatus.ok(), connectStatus.toString());
+          result.board.readFlash(0, kPayloadSize, function(readResult) {
+            assert.equal(true, readResult.status.ok(), readResult.status.toString());
+
+            for (var i = 0; i < kPayloadSize; ++i) {
+              assert.equal(
+                payloadPattern[i % payloadPattern.length],
+                readResult.data[i],
+                "Mismatched byte at offset: " + i + ". Expected:  " +
+                  payloadPattern[i % payloadPattern.length] + ", Actual: " + readResult.data[i]);
+            }
+            done();
+          })
+        });
       });
     });
   });

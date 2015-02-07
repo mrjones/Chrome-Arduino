@@ -388,6 +388,7 @@ Stk500Board.prototype.disconnectAndReturn_ = function(doneCb, status) {
 // READ FLASH
 //
 Stk500Board.prototype.readFlashImpl_ = function(boardAddress, length, doneCb) {
+  log(kDebugNormal, "STK500::ReadFlash @" + boardAddress + "+" + length);
   if (this.state_ != Stk500Board.State.CONNECTED) {
     return {status: Status.Error("Not connected to board: " + this.state_), data: []}
   }
@@ -397,10 +398,12 @@ Stk500Board.prototype.readFlashImpl_ = function(boardAddress, length, doneCb) {
 };
 
 Stk500Board.prototype.readChunkSetAddress_ = function(data, boardAddress, length, currentOffset, doneCb) {
+  log(kDebugNormal, "STK500::ReadChunkSetAddress @" + boardAddress + "+" + length + " ... " + currentOffset);
   var board = this;
-  var currentAddress = boardAddress + currentOffset;
-  var addressHi = (currentAddress & 0xFF00) >> 8;
-  var addressLo = currentAddress & 0x00FF;
+  var currentByteAddress = boardAddress + currentOffset;
+  var currentWordAddress = currentByteAddress / STK.BYTES_PER_WORD
+  var addressHi = (currentWordAddress & 0xFF00) >> 8;
+  var addressLo = currentWordAddress & 0x00FF;
   this.writeAndGetFixedSizeReply_(
     [ STK.LOAD_ADDRESS, addressLo, addressHi, STK.CRC_EOP ],
     2,
@@ -417,25 +420,29 @@ Stk500Board.prototype.readChunkSetAddress_ = function(data, boardAddress, length
 
 Stk500Board.prototype.readChunkReadData_ = function(data, address, length, currentOffset, doneCb) {
   var kChunkSize = 128;
-  var readSize = Math.min(kChunkSize, lengthRemaining);
+  var readSize = Math.min(kChunkSize, (length - currentOffset));
 
   var sizeHi = (readSize & 0xFF00) >> 8;
   var sizeLo = readSize & 0x00FF;
+
+  var board = this;
   this.writeAndGetFixedSizeReply_(
     [ STK.READ_PAGE, sizeHi, sizeLo, STK.FLASH_MEMORY, STK.CRC_EOP ],
     readSize + 2,
     function(readArg) {
       var d = binToHex(readArg.data);
-      if (d[0] == STK.IN_SYNC && d[d.length - 1] == STK.OK) {
+      if (d[0] == STK.IN_SYNC && d[readSize + 1] == STK.OK) {
         for (var i = 0; i < readSize; i++) {
           data[currentOffset++] = d[i + 1];
-          if (currentOffset >= length) {
-            doneCb({status: Status.OK, data: data});
-          } else {
-            board.readPageLoadAddress_(data, address, length, currentOffset, doneCb);
-          }
+        }
+
+        if (currentOffset >= length) {
+          doneCb({status: Status.OK, data: data});
+        } else {
+          board.readChunkSetAddress_(data, address, length, currentOffset, doneCb);
         }
       } else {
+        console.log(hexRep(d));
         doneCb({status: Status.Error(
           "Error reading data at [" + address + ", " + (address + readSize) + ")"), data: []});
         return;

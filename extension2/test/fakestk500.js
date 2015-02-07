@@ -151,14 +151,40 @@ FakeStk500.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
     var wordAddress = (payload[2] << 8) + payload[1];
     var byteAddress = wordAddress * STK.BYTES_PER_WORD;
     this.addressPtr_ = byteAddress;
+    console.log("Address PTR now: " + this.addressPtr_);
     this.sendReply_([STK.IN_SYNC, STK.OK]);
     return;
+  }
+
+  if (hasPrefix(payload, [STK.READ_PAGE]) && payload.length >= 5) {
+    var length = (payload[1] << 8) + payload[2];
+    // TODO(mrjones): verify addressPtr != -1
+    // TODO(mrjones): Support different kinds of memory??
+    // TODO(mrjones): verify that payload[3] == STK.FLASH_MEMORY
+    // TODO(mrjones): verify that payload[<last>] == STK.CRC_EOP
+
+    if (this.addressPtr_ + length >= this.memory_.length) {
+      console.log("Tried to read past end of board!");
+      return;
+    }
+
+    done({bytesSent: payload.length});
+
+    var reply = new Array(length + 2);
+    reply[0] = STK.IN_SYNC;
+    reply[length + 1] = STK.OK;
+
+    for (var i = 0; i < length; i++) {
+      reply[i + 1] = this.memory_[this.addressPtr_ + i];
+    }
+
+    this.sendReply_(reply);
   }
 
   if (hasPrefix(payload, [STK.PROGRAM_PAGE]) && payload.length >= 5) {
     var length = (payload[1] << 8) + payload[2];
     // TODO(mrjones): verify in PROG_MODE
-    // TODO(mrjones): verify addressPtr
+    // TODO(mrjones): verify addressPtr != -1
     // TODO(mrjones): Support different kinds of memory??
     // TODO(mrjones): verify that payload[3] == STK.FLASH_MEMORY
     // TODO(mrjones): verify that payload[<last>] == STK.CRC_EOP
