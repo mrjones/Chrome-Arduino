@@ -14,7 +14,7 @@ var kDebugVeryFine = logging.kDebugVeryFine;
 //
 // API
 //
-function NewStk500Board(serial, pageSize) {
+function NewStk500Board(serial, pageSize, opt_options) {
   if (typeof(serial) === "undefined") {
     return { status: Status.Error("serial is undefined") }
   }
@@ -23,7 +23,7 @@ function NewStk500Board(serial, pageSize) {
     return { status: Status.Error("pageSize is undefined") }
   }
 
-  return { status: Status.OK, board: new Stk500Board(serial, pageSize) }
+  return { status: Status.OK, board: new Stk500Board(serial, pageSize, opt_options) }
 }
 
 Stk500Board.prototype.connect = function(deviceName, doneCb) {
@@ -72,11 +72,18 @@ Stk500Board.prototype.readHandler_ = null;
 Stk500Board.prototype.serial_ = null;
 Stk500Board.prototype.serialListener_ = null;
 Stk500Board.prototype.state_ = Stk500Board.State.DISCONNECTED;
+Stk500Board.prototype.connectionDelayMs_ = 2000;
 
-function Stk500Board(serial, pageSize) {
+function Stk500Board(serial, pageSize, opt_options) {
   this.serial_ = serial;
   this.pageSize_ = pageSize;
   this.readHandler_ = this.discardData_;
+
+  if (typeof(opt_options) != "undefined") {
+    if (typeof(opt_options) != "undefined") {
+      this.connectDelayMs_ = opt_options.connectDelayMs;
+    }
+  }
 };
 
 //
@@ -203,7 +210,7 @@ Stk500Board.prototype.twiddleControlLines_ = function(doneCb) {
         });
       }, 250);
     });
-  }, 2000);
+  }, this.connectDelayMs_);
 }
 
 Stk500Board.prototype.getSync_ = function(doneCb, attempts) {

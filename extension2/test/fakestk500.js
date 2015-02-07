@@ -85,6 +85,7 @@ FakeStk500.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
   var payload = binary.binToHex(binaryPayload);
 
   // We're in the bootloader! What should we do with this command:
+
   if (arraysEqual(payload, [STK.GET_SYNC, STK.CRC_EOP])) {
     done({bytesSent: payload.length});
     this.sendReply_([STK.IN_SYNC, STK.OK]);
@@ -99,6 +100,9 @@ FakeStk500.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
   }
 }
 
+// TODO(mrjones): implement modes where replies are sent in various, weird ways:
+// - After a delay
+// - Broken up into multiple packets
 FakeStk500.prototype.sendReply_ = function(payload) {
   var binaryPayload = binary.hexToBin(payload);
   for (var i = 0; i < this.listeners_.length; i++) {

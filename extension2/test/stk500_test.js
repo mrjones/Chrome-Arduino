@@ -14,17 +14,13 @@ describe("stk500", function() {
   });
 
   it("connects", function(done) {
-    // We pause 2s before twiddling the control lines, so the test timeout has to
-    // be longer.
-    // TODO(mrjones): make the twiddle pause configurable, and shorten it.
-    this.timeout(5000);
-
     var fake = new FakeStk500();
-    var result = stk500.NewStk500Board(fake, 1024);
+    var result = stk500.NewStk500Board(fake, 128, {connectDelayMs: 10});
 
     assert.equal(true, result.status.ok(), result.status.toString());
 
     result.board.connect("devicename", function(connectStatus) {
+      assert.equal(true, connectStatus.ok(), connectStatus.toString());
       done();
     });
   });
