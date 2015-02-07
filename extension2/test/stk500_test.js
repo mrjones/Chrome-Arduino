@@ -39,7 +39,7 @@ describe("stk500", function() {
   it("writesFlash", function(done) {
     var fake = new FakeStk500(2048);
     var result = stk500.NewStk500Board(fake, 128, {connectDelayMs: 10});
-    var kPayloadSize = 256;
+    var kPayloadSize = 1024;
 
     assert.equal(true, result.status.ok(), result.status.toString());
 
@@ -47,15 +47,17 @@ describe("stk500", function() {
       assert.equal(true, connectStatus.ok(), connectStatus.toString());
 
       result.board.writeFlash(0, genPayload(kPayloadSize), function(writeStatus) {
-        assert.equal(true, connectStatus.ok(), connectStatus.toString());
+        assert.equal(true, writeStatus.ok(), writeStatus.toString());
 
-        // TODO(mrjones): verify the flash memory.
-        // Ideally we'd do this with read flash, but for now maybe we just ask
-        // the fake directly.
-
+        // TODO(mrjones): Ideally we'd do this via readFlash.
         for (var i = 0; i < kPayloadSize; ++i) {
-          assert.equal(payloadPattern[i % payloadPattern.length], fake.memory_[i]);
+          assert.equal(
+            payloadPattern[i % payloadPattern.length],
+            fake.memory_[i],
+            "Mismatched byte at offset: " + i + ". Expected:  " +
+              payloadPattern[i % payloadPattern.length] + ", Actual: " + fake.memory_[i]);
         }
+
         done();
       });
     });

@@ -198,6 +198,13 @@ FakeStk500.prototype.addListenerImpl_ = function(listener) {
 }
 
 FakeStk500.prototype.removeListenerImpl_ = function(listener) {
+  for (var i = 0; i < this.listeners_.length; i++) {
+    if (this.listeners_[i] == listener) {
+      console.log("Removing listener #" + i);
+      this.listeners_ = this.listeners_.splice(i, 1);
+      return;
+    }
+  }
 }
 
 FakeStk500.prototype.setControlSignalsImpl_ = function(connectionId, signals, done) {
