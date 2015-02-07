@@ -5,12 +5,24 @@ var FakeStk500 = function(memorySize) {
   this.onReceive.addListener = this.addListenerImpl_.bind(this);
   this.onReceive.removeListener = this.removeListenerImpl_.bind(this);
 
+  this.nextConnectionId_ = 10;
+  this.reset_();
+
   this.memory_ = new Array(memorySize);
   for (var i = 0; i < memorySize; i++) {
     // Write random data to the board
     // this.memory_[i] = Math.floor(Math.random() * 256);
     this.memory_[i] = 0;
   }
+}
+
+FakeStk500.prototype.reset_ = function() {
+  this.addressPtr_ = -1;
+  this.bootloaderState_ = FakeStk500.BootloaderState.NOT_IN_BOOTLOADER;
+  this.connectionId_ = -1;
+  this.inProgmode_ = false;
+  this.listeners_ = [];
+  this.serialConnected_ = false;
 }
 
 // Chrome Serial API
@@ -45,15 +57,6 @@ FakeStk500.BootloaderState = {
   IN_BOOTLOADER: 2,
 };
 
-FakeStk500.prototype.addressPtr_ = -1;
-FakeStk500.prototype.bootloaderState_ = FakeStk500.BootloaderState.NOT_IN_BOOTLOADER;
-FakeStk500.prototype.connectionId_ = -1;
-FakeStk500.prototype.inProgmode_ = false;
-FakeStk500.prototype.listeners_ = [];
-FakeStk500.prototype.memory_ = null;  // Initialized in constructor
-FakeStk500.prototype.nextConnectionId_ = 10;
-FakeStk500.prototype.serialConnected_ = false;
-
 FakeStk500.prototype.connectImpl_ = function(deviceName, options, done) {
   this.serialConnected_ = true;
   this.connectionId_ = this.nextConnectionId_++;
@@ -63,10 +66,7 @@ FakeStk500.prototype.connectImpl_ = function(deviceName, options, done) {
 
 FakeStk500.prototype.disconnectImpl_ = function(connectionId, done) {
   if (this.connectionId_ == connectionId) {
-    this.connectiondId_ = -1;
-    this.serialConnected_ = false;
-    this.bootloaderState_ = FakeStk500.BootloaderState.NOT_IN_BOOTLOADER;
-    this.inProgmode = false;
+    this.reset_();
     done(true);
   } else {
     done(false); 
@@ -195,16 +195,21 @@ FakeStk500.prototype.sendReply_ = function(payload) {
 
 FakeStk500.prototype.addListenerImpl_ = function(listener) {
   this.listeners_.push(listener);
+  console.log("LISTENERS: new -> " + this.listeners_.length);
 }
 
 FakeStk500.prototype.removeListenerImpl_ = function(listener) {
+  console.log("Removing listener.");
+
   for (var i = 0; i < this.listeners_.length; i++) {
     if (this.listeners_[i] == listener) {
-      console.log("Removing listener #" + i);
       this.listeners_ = this.listeners_.splice(i, 1);
+      console.log("LISTENERS: removing #" + i + " -> " + this.listeners_.length);
       return;
     }
   }
+
+  console.log("No listeners matched for removal");
 }
 
 FakeStk500.prototype.setControlSignalsImpl_ = function(connectionId, signals, done) {

@@ -18,6 +18,7 @@ describe("stk500", function() {
   var fake = null;
 
   beforeEach(function() {
+    console.log("LISTENERS: new board");
     fake = new FakeStk500(kPageSize * 10);
   });
 
