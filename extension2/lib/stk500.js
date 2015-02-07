@@ -70,6 +70,7 @@ Stk500Board.prototype.connectionId_ = -1;
 Stk500Board.prototype.pageSize_ = -1;
 Stk500Board.prototype.readHandler_ = null;
 Stk500Board.prototype.serial_ = null;
+Stk500Board.prototype.serialListener_ = null;
 Stk500Board.prototype.state_ = Stk500Board.State.DISCONNECTED;
 
 function Stk500Board(serial, pageSize) {
@@ -172,8 +173,8 @@ Stk500Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   this.connectionId_ = connectArg.connectionId;
 
   // TODO: be more careful about removing this listener
-  this.serial_.onReceive.addListener(
-    this.handleRead_.bind(this));
+  this.serialListener_ = this.handleRead_.bind(this);
+  this.serial_.onReceive.addListener(this.serialListener_);
 
   this.twiddleControlLines_(doneCb);
 }
@@ -269,8 +270,6 @@ Stk500Board.prototype.writeFlashImpl_ = function(boardAddress, data, doneCb) {
         + (data.length % this.pageSize_) + ")"));
   }
 
-  log(kDebugFine, hexRep(data))
-
   log(kDebugFine, "STK500::WriteFlash (" + data.length + " bytes)");
 
   var board = this;
@@ -355,13 +354,14 @@ Stk500Board.prototype.doneWriting_ = function(doneCb) {
     [ STK.LEAVE_PROGMODE, STK.CRC_EOP ],
     2,
     function(readArg) {
-      //  this.serial_.onReceive.removeListener(this.handleRead_.bind(this))
       log(kDebugFine, "STK500::Disconnecting")
       board.serial_.disconnect(board.connectionId_, function(disconnectArg) {
         log(kDebugFine, "STK500::Disconnected")
         board.connectionId_ = -1;
         board.state_ = Stk500Board.State.DISCONNECTED; 
         board.readHandler_ = null
+        board.serial_.onReceive.removeListener(board.serialListener_);
+        board.SerialListener_ = null;
 
         doneCb(Status.OK);
       });

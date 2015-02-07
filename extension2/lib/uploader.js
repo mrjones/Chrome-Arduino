@@ -99,7 +99,7 @@ function fetchProgram(url, handler) {
     if (xhr.readyState == 4) {
       if (xhr.status == 200) {
         var programBytes = ParseHexFile(xhr.responseText);
-        log(kDebugFine, "Fetched Data: " + xhr.responseText);
+        log(kDebugFine, "Fetched Data:\n" + xhr.responseText);
 //        log(kDebugFine, "Program Data: " + xhr.responseText.substring(0,25) + "...");
         handler(programBytes);
       } else {
