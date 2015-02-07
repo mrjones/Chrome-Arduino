@@ -6,6 +6,11 @@ var FakeStk500 = function(memorySize) {
   this.onReceive.removeListener = this.removeListenerImpl_.bind(this);
 
   this.memory_ = new Array(memorySize);
+  for (var i = 0; i < memorySize; i++) {
+    // Write random data to the board
+    // this.memory_[i] = Math.floor(Math.random() * 256);
+    this.memory_[i] = 0;
+  }
 }
 
 // Chrome Serial API
@@ -159,6 +164,11 @@ FakeStk500.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
     // TODO(mrjones): verify that payload[<last>] == STK.CRC_EOP
     if (length + 5 != payload.length) {
       console.log("Bad PROG_PAGE command. " + length + " + 5 != " + payload.length);
+      return;
+    }
+
+    if (this.addressPtr_ + length >= this.memory_.length) {
+      console.log("Tried to write past end of board!");
       return;
     }
 

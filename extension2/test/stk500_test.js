@@ -37,20 +37,25 @@ describe("stk500", function() {
   });
 
   it("writesFlash", function(done) {
-    var fake = new FakeStk500();
+    var fake = new FakeStk500(2048);
     var result = stk500.NewStk500Board(fake, 128, {connectDelayMs: 10});
+    var kPayloadSize = 256;
 
     assert.equal(true, result.status.ok(), result.status.toString());
 
     result.board.connect("devicename", function(connectStatus) {
       assert.equal(true, connectStatus.ok(), connectStatus.toString());
 
-      result.board.writeFlash(0, genPayload(256), function(writeStatus) {
+      result.board.writeFlash(0, genPayload(kPayloadSize), function(writeStatus) {
         assert.equal(true, connectStatus.ok(), connectStatus.toString());
 
         // TODO(mrjones): verify the flash memory.
         // Ideally we'd do this with read flash, but for now maybe we just ask
         // the fake directly.
+
+        for (var i = 0; i < kPayloadSize; ++i) {
+          assert.equal(payloadPattern[i % payloadPattern.length], fake.memory_[i]);
+        }
         done();
       });
     });
