@@ -52,7 +52,8 @@ var STK = {
   ENTER_PROGMODE: 0x50,
   LEAVE_PROGMODE: 0x51,
   LOAD_ADDRESS: 0x55,
-  PROG_PAGE: 0x64,
+  PROGRAM_PAGE: 0x64,
+  READ_PAGE: 0x74,
   HW_VER: 0x80,
   SW_VER_MAJOR: 0x81,
   SW_VER_MINOR: 0x82,
@@ -332,7 +333,7 @@ Stk500Board.prototype.writePageData_ = function(dataStart, data, pageNo, doneCb)
   var sizeLo = (this.pageSize_ & 0x00FF);
   var sizeHi = (this.pageSize_ & 0xFF00) >> 8;
 
-  var message = [ STK.PROG_PAGE, sizeHi, sizeLo, STK.FLASH_MEMORY ];
+  var message = [ STK.PROGRAM_PAGE, sizeHi, sizeLo, STK.FLASH_MEMORY ];
   message = message.concat(payload);
   message.push(STK.CRC_EOP);
 
@@ -386,14 +387,63 @@ Stk500Board.prototype.disconnectAndReturn_ = function(doneCb, status) {
 //
 // READ FLASH
 //
-Stk500Board.prototype.readFlash = function(boardAddress, length, doneCb) {
-  this.readFlashImpl_(boardAddress, length, doneCb);
+Stk500Board.prototype.readFlashImpl_ = function(boardAddress, length, doneCb) {
   if (this.state_ != Stk500Board.State.CONNECTED) {
-    return Status.Error("Not connected to board: " + this.state_);
+    return {status: Status.Error("Not connected to board: " + this.state_), data: []}
   }
 
-  log(kDebugError, "Not implemented");
+  var data = new Array(length);
+  this.readChunkSetAddress_(data, boardAddress, length, 0, doneCb);
 };
+
+Stk500Board.prototype.readChunkSetAddress_ = function(data, boardAddress, length, currentOffset, doneCb) {
+  var board = this;
+  var currentAddress = boardAddress + currentOffset;
+  var addressHi = (currentAddress & 0xFF00) >> 8;
+  var addressLo = currentAddress & 0x00FF;
+  this.writeAndGetFixedSizeReply_(
+    [ STK.LOAD_ADDRESS, addressLo, addressHi, STK.CRC_EOP ],
+    2,
+    function(readArg) {
+      var d = binToHex(readArg.data);
+      if (d.length == 2 && d[0] == STK.IN_SYNC && d[1] == STK.OK) {
+        board.readChunkReadData_(data, boardAddress, length, currentOffset, doneCb);
+      } else {
+        doneCb({status: Status.Error("Error loading address @" + address), data: []});
+        return;
+      }
+    });
+}
+
+Stk500Board.prototype.readChunkReadData_ = function(data, address, length, currentOffset, doneCb) {
+  var kChunkSize = 128;
+  var readSize = Math.min(kChunkSize, lengthRemaining);
+
+  var sizeHi = (readSize & 0xFF00) >> 8;
+  var sizeLo = readSize & 0x00FF;
+  this.writeAndGetFixedSizeReply_(
+    [ STK.READ_PAGE, sizeHi, sizeLo, STK.FLASH_MEMORY, STK.CRC_EOP ],
+    readSize + 2,
+    function(readArg) {
+      var d = binToHex(readArg.data);
+      if (d[0] == STK.IN_SYNC && d[d.length - 1] == STK.OK) {
+        for (var i = 0; i < readSize; i++) {
+          data[currentOffset++] = d[i + 1];
+          if (currentOffset >= length) {
+            doneCb({status: Status.OK, data: data});
+          } else {
+            board.readPageLoadAddress_(data, address, length, currentOffset, doneCb);
+          }
+        }
+      } else {
+        doneCb({status: Status.Error(
+          "Error reading data at [" + address + ", " + (address + readSize) + ")"), data: []});
+        return;
+      }
+    });
+
+}
+
 
 exports.NewStk500Board = NewStk500Board;
 exports.STK = STK;

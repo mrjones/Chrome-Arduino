@@ -155,7 +155,7 @@ FakeStk500.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
     return;
   }
 
-  if (hasPrefix(payload, [STK.PROG_PAGE]) && payload.length >= 5) {
+  if (hasPrefix(payload, [STK.PROGRAM_PAGE]) && payload.length >= 5) {
     var length = (payload[1] << 8) + payload[2];
     // TODO(mrjones): verify in PROG_MODE
     // TODO(mrjones): verify addressPtr
