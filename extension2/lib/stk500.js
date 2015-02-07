@@ -188,14 +188,14 @@ Stk500Board.prototype.twiddleControlLines_ = function(doneCb) {
     log(kDebugFine, "STK500::TwiddlingControlLines");
     serial.setControlSignals(cid, {dtr: false, rts: false}, function(ok) {
       if (!ok) {
-        doneCb(Status.Error("Couldn't set dtr/rts low"));
+        board.disconnectAndReturn_(doneCb, Status.Error("Couldn't set dtr/rts low"));
         return;
       }
       log(kDebugVeryFine, "STK500::DTR is false");
       setTimeout(function() {
         serial.setControlSignals(cid, {dtr: true, rts: true}, function(ok) {
           if (!ok) {
-            doneCb(Status.Error("Couldn't set dtr/rts high"));
+            board.disconnectAndReturn_(doneCb, Status.Error("Couldn't set dtr/rts high"));
             return;
           }
           log(kDebugVeryFine, "STK500::DTR is true");
@@ -224,8 +224,7 @@ Stk500Board.prototype.getSync_ = function(doneCb, attempts) {
             board.getSync_(doneCb, attempts + 1);
           }, 50);
         } else {
-          // TODO(mrjones): call doneCb with the error
-          log(kDebugError, "Couldn't get sync");
+          board.disconnectAndReturn(doneCb, Status.Error("Couldn't get sync"));
         }
       }
     });
@@ -354,18 +353,24 @@ Stk500Board.prototype.doneWriting_ = function(doneCb) {
     [ STK.LEAVE_PROGMODE, STK.CRC_EOP ],
     2,
     function(readArg) {
-      log(kDebugFine, "STK500::Disconnecting")
-      board.serial_.disconnect(board.connectionId_, function(disconnectArg) {
-        log(kDebugFine, "STK500::Disconnected")
-        board.connectionId_ = -1;
-        board.state_ = Stk500Board.State.DISCONNECTED; 
-        board.readHandler_ = null
-        board.serial_.onReceive.removeListener(board.serialListener_);
-        board.SerialListener_ = null;
-
-        doneCb(Status.OK);
-      });
+      board.disconnectAndReturn_(doneCb, Status.OK);
     });
+}
+
+Stk500Board.prototype.disconnectAndReturn_ = function(doneCb, status) {
+  var board = this;
+  log(kDebugFine, "STK500::Disconnecting")
+  this.serial_.disconnect(this.connectionId_, function(disconnectArg) {
+    log(kDebugFine, "STK500::Disconnected: " + JSON.stringify(disconnectArg));
+
+    board.connectionId_ = -1;
+    board.state_ = Stk500Board.State.DISCONNECTED; 
+    board.readHandler_ = null
+    board.serial_.onReceive.removeListener(board.serialListener_);
+    board.SerialListener_ = null;
+
+    doneCb(status);
+  });
 }
 
 //
