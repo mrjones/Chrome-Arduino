@@ -386,3 +386,4 @@ Stk500Board.prototype.readFlash = function(boardAddress, length, doneCb) {
 };
 
 exports.NewStk500Board = NewStk500Board;
+exports.STK = STK;
