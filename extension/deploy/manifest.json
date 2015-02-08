@@ -9,7 +9,6 @@
     }
   },
   "permissions": [
-    "extension",
     "serial",
     "usb",
     "http://*/"
