@@ -1,5 +1,12 @@
 var binary = require("../lib/binary.js");
+var logging = require("../lib/logging.js")
 var STK = require("../lib/stk500.js").STK;
+
+var log = logging.log;
+var kDebugError = logging.kDebugError;
+var kDebugNormal = logging.kDebugNormal;
+var kDebugFine = logging.kDebugFine;
+var kDebugVeryFine = logging.kDebugVeryFine;
 
 var FakeStk500 = function(memorySize) {
   this.onReceive.addListener = this.addListenerImpl_.bind(this);
@@ -151,7 +158,7 @@ FakeStk500.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
     var wordAddress = (payload[2] << 8) + payload[1];
     var byteAddress = wordAddress * STK.BYTES_PER_WORD;
     this.addressPtr_ = byteAddress;
-    console.log("Address PTR now: " + this.addressPtr_);
+    log(kDebugFine, "Address PTR now: " + this.addressPtr_);
     this.sendReply_([STK.IN_SYNC, STK.OK]);
     return;
   }
@@ -164,7 +171,7 @@ FakeStk500.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
     // TODO(mrjones): verify that payload[<last>] == STK.CRC_EOP
 
     if (this.addressPtr_ + length >= this.memory_.length) {
-      console.log("Tried to read past end of board!");
+      log(kDebugError, "Tried to read past end of board!");
       return;
     }
 
@@ -189,12 +196,12 @@ FakeStk500.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
     // TODO(mrjones): verify that payload[3] == STK.FLASH_MEMORY
     // TODO(mrjones): verify that payload[<last>] == STK.CRC_EOP
     if (length + 5 != payload.length) {
-      console.log("Bad PROG_PAGE command. " + length + " + 5 != " + payload.length);
+      log(kDebugError, "Bad PROG_PAGE command. " + length + " + 5 != " + payload.length);
       return;
     }
 
     if (this.addressPtr_ + length >= this.memory_.length) {
-      console.log("Tried to write past end of board!");
+      log(kDebugError, "Tried to write past end of board!");
       return;
     }
 
@@ -221,21 +228,15 @@ FakeStk500.prototype.sendReply_ = function(payload) {
 
 FakeStk500.prototype.addListenerImpl_ = function(listener) {
   this.listeners_.push(listener);
-  console.log("LISTENERS: new -> " + this.listeners_.length);
 }
 
 FakeStk500.prototype.removeListenerImpl_ = function(listener) {
-  console.log("Removing listener.");
-
   for (var i = 0; i < this.listeners_.length; i++) {
     if (this.listeners_[i] == listener) {
       this.listeners_ = this.listeners_.splice(i, 1);
-      console.log("LISTENERS: removing #" + i + " -> " + this.listeners_.length);
       return;
     }
   }
-
-  console.log("No listeners matched for removal");
 }
 
 FakeStk500.prototype.setControlSignalsImpl_ = function(connectionId, signals, done) {

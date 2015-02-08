@@ -36,8 +36,13 @@ function consoleLog(message) {
   }
 }
 
+function setConsoleLogLevel(level) {
+  consoleLevel = level;
+}
+
 function log(level, message) {
   if (level <= consoleLevel) {
+    console.log(level + " vs. " + consoleLevel);
     console.log(message);
   }
   if (level <= visibleLevel) {
@@ -51,4 +56,5 @@ exports.kDebugNormal = kDebugNormal;
 exports.kDebugFine = kDebugFine;
 exports.kDebugVeryFine = kDebugVeryFine;
 exports.visibleLevel = visibleLevel;
+exports.setConsoleLogLevel = setConsoleLogLevel;
 exports.configureVisibleLogging = configureVisibleLogging;

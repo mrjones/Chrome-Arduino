@@ -170,11 +170,9 @@ Stk500Board.prototype.connectImpl_ = function(deviceName, doneCb) {
 }
 
 Stk500Board.prototype.serialConnected_ = function(connectArg, doneCb) {
-  console.log(JSON.stringify(connectArg));
   if (typeof(connectArg) == "undefined" ||
       typeof(connectArg.connectionId) == "undefined" ||
       connectArg.connectionId == -1) {
-    console.log("error");
     doneCb(Status.Error("Unable to connect to device!"));
     return;
   }
@@ -442,7 +440,7 @@ Stk500Board.prototype.readChunkReadData_ = function(data, address, length, curre
           board.readChunkSetAddress_(data, address, length, currentOffset, doneCb);
         }
       } else {
-        console.log(hexRep(d));
+//        console.log(hexRep(d));
         doneCb({status: Status.Error(
           "Error reading data at [" + address + ", " + (address + readSize) + ")"), data: []});
         return;
