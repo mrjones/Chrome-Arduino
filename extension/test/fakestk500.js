@@ -1,6 +1,6 @@
-var binary = require("../lib/binary.js");
-var logging = require("../lib/logging.js")
-var STK = require("../lib/stk500.js").STK;
+var binary = require("../src/binary.js");
+var logging = require("../src/logging.js")
+var STK = require("../src/stk500.js").STK;
 
 var log = logging.log;
 var kDebugError = logging.kDebugError;

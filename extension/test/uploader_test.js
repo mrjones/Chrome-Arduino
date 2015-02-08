@@ -1,5 +1,5 @@
 var assert = require('assert');
-var uploader = require('../lib/uploader');
+var uploader = require('../src/uploader.js');
 
 describe("uploader", function() {
 

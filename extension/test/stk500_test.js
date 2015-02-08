@@ -1,7 +1,7 @@
 var assert = require("assert")
-var stk500 = require("../lib/stk500.js")
+var stk500 = require("../src/stk500.js")
 var FakeStk500 = require("./fakestk500.js").FakeStk500;
-var logging = require("../lib/logging.js")
+var logging = require("../src/logging.js")
 
 var payloadPattern = [ 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09 ];
 

@@ -1,5 +1,5 @@
 var assert = require("assert")
-var avr109 = require("../lib/avr109.js")
+var avr109 = require("../src/avr109.js")
 
 describe("avr109", function() {
   it("doesn't write until connected", function(done) {
