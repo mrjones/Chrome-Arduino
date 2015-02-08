@@ -12,9 +12,9 @@ Directory Structure:
 - /test - DEPRECATED, replaced by extension2/test
 
 
-Unit Tests
-==========
+Build and Test
+==============
 
-Either:
-- Open `extension/unittest.html` in a browser
-- Or, Use [PhantomJS](http://phantomjs.org): `path/to/phantomjs extension/runtests_phantom.js `
+`cd` to /extension2 and run `./build.sh` and `./test.sh`
+
+
