@@ -64,7 +64,7 @@ function logLevelChanged() {
   var logLevelMenu = document.getElementById(ids.logLevelMenu);
   var logLevel = logLevelMenu.options[logLevelMenu.selectedIndex].value;
 
-  logging.visibleLevel = logLevel;
+  logging.setVisibleLogLevel(logLevel);
 }
 
 function uploadButtonPressed() {
