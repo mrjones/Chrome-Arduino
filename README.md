@@ -11,6 +11,9 @@ Directory Structure:
   - test - Test files, not packaged into the extension at all
 - /test - DEPRECATED, replaced by extension2/test
 
+Install
+=======
+This is a work in progress, and is often broken and always buggy and hard to understand.  However, if you really want to install the extension, a compiled version exists at extension2/extension.crx .
 
 Build and Test
 ==============
