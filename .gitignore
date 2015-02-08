@@ -1,4 +1,5 @@
 chrome-arduino-extension.pem
+extension2/chrome-arduino-extension.pem
 extension2/node_modules
 extension2/extension/js/*.js
 
