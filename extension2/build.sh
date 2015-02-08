@@ -1,6 +1,7 @@
-# sudo apt-get install nodejs
+# sudo apt-get install nodejs npm
 # sudo ln -s /usr/bin/nodejs /usr/bin/node
 # npm-install grunt-browserify
+# sudo npm install -g grunt-cli
 # sudo npm install -g grunt-cli
 # sudo npm install -g mocha
 grunt
