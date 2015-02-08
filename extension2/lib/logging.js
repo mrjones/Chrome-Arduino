@@ -14,11 +14,15 @@ function configureVisibleLogging(divName) {
 
 function timestampString() {
   var now = new Date();
-  var pad = function(n) {
-    if (n < 10) { return "0" + n; }
-    return n;
+  var pad = function(n, width) {
+    var acc = n;
+    while (n < Math.pow(10, width - 1)) {
+      acc = "0" + acc;
+      width = width - 1;
+    }
+    return acc;
   }
-  return pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds()) + "." + now.getMilliseconds();
+  return pad(now.getHours(), 2) + ":" + pad(now.getMinutes(), 2) + ":" + pad(now.getSeconds(), 2) + "." + pad(now.getMilliseconds(), 3);
 }
 
 function visibleLog(message) {
