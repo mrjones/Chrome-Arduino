@@ -1,7 +1,10 @@
+var arrays = require("../src/arrays.js")
 var binary = require("../src/binary.js");
 var logging = require("../src/logging.js")
 var STK = require("../src/stk500.js").STK;
 
+var arraysEqual = arrays.arraysEqual;
+var hasPrefix = arrays.hasPrefix;
 var log = logging.log;
 var kDebugError = logging.kDebugError;
 var kDebugNormal = logging.kDebugNormal;
@@ -80,34 +83,6 @@ FakeStk500.prototype.disconnectImpl_ = function(connectionId, done) {
   }
 }
 
-var arraysEqual = function(a1, a2) {
-  if (a1.length != a2.length) {
-    return false;
-  }
-
-  for (var i = 0; i < a1.length; i++) {
-    if (a1[i] != a2[i]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-var hasPrefix = function(candidate, prefix) {
-  if (candidate.length < prefix.length) {
-    return false;
-  }
-
-  for (var i = 0; i < prefix.length; i++) {
-    if (prefix[i] != candidate[i]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 FakeStk500.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
   if (!this.serialConnected_) {
     done({error: "disconnected", bytesSent: 0});
@@ -117,7 +92,7 @@ FakeStk500.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
   if (this.bootloaderState_ != FakeStk500.BootloaderState.IN_BOOTLOADER) {
     // Not in the bootloader, just pretend we sent the data to the app, but
     // don't change our state.
-    done({bytesSent: binaryPayload.length});
+    done({bytesSent: binaryPayload.byteLength});
     return;
   }
 

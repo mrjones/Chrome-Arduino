@@ -1,7 +1,10 @@
+var arrays = require("../src/arrays.js")
 var binary = require("../src/binary.js");
 var logging = require("../src/logging.js")
 var AVR = require("../src/avr109.js").AVR;
 
+var arraysEqual = arrays.arraysEqual;
+var hasPrefix = arrays.hasPrefix;
 var log = logging.log;
 var kDebugError = logging.kDebugError;
 var kDebugNormal = logging.kDebugNormal;
@@ -13,6 +16,7 @@ var FakeAvr109 = function(memorySize) {
   this.onReceive.removeListener = this.removeListenerImpl_.bind(this);
 
   this.reset_();
+  this.nextConnectionId_ = 57;
   this.memory_ = new Array(memorySize);
   for (var i = 0; i < memorySize; i++) {
     this.memory_[i] = 0;
@@ -20,13 +24,16 @@ var FakeAvr109 = function(memorySize) {
 }
 
 FakeAvr109.prototype.reset_ = function() {
+  this.bootloaderRunning_ = false;
+  this.bootloaderPortName_ = "bootloader-port";
   this.connectionId_ = -1;
   this.serialConnected_ = false;
+  this.listeners_ = [];
 }
 
 // Chrome Serial API
 FakeAvr109.prototype.connect = function(deviceName, options, done) {
-  done(Status.Error("Not implemented"));
+  this.connectImpl_(deviceName, options, done);
 }
 
 FakeAvr109.prototype.disconnect = function(connectionId, done) {
@@ -41,6 +48,10 @@ FakeAvr109.prototype.setControlSignals = function(connectionId, signals, done) {
   this.setControlSignalsImpl_(connectionId, signals, done);
 }
 
+FakeAvr109.prototype.getDevices = function(done) {
+  this.getDevicesImpl_(done);
+}
+
 FakeAvr109.prototype.onReceive = {
   // Initialized in constructor.
   // TODO(mrjones): make this less ugly
@@ -50,11 +61,32 @@ FakeAvr109.prototype.onReceive = {
 
 // Implementation
 
+FakeAvr109.prototype.getDevicesImpl_ = function(done) {
+  var ports = [ { path: "foo" }, { path: "bar" } ];
+  
+  if (this.bootloaderRunning_) {
+    ports.push({path: this.bootloaderPortName_});
+  }
+
+  done(ports);
+}
+
 FakeAvr109.prototype.connectImpl_ = function(deviceName, options, done) {
   this.serialConnected_ = true;
   this.connectionId_ = this.nextConnectionId_++;
 
-  done({connectionId: this.connectionId_});
+  if (this.bootloaderRunning_ && deviceName == this.bootloaderPortName_) {
+    // Connected to the bootloader
+    done({connectionId: this.connectionId_});
+  } else {
+    // Just a normal connection
+    done({connectionId: this.connectionId_});
+
+    if (typeof(options.bitrate) != "undefined" && options.bitrate == AVR.MAGIC_BITRATE) {
+      log(kDebugFine, "FakeA109: Launching bootloader");
+      this.bootloaderRunning_ = true;
+    }
+  }
 }
 
 FakeAvr109.prototype.disconnectImpl_ = function(connectionId, done) {
@@ -67,6 +99,30 @@ FakeAvr109.prototype.disconnectImpl_ = function(connectionId, done) {
 }
 
 FakeAvr109.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
+  if (!this.serialConnected_) {
+    done({error: "disconnected", bytesSent: 0});
+    return;
+  }
+
+  if (!this.bootloaderRunning_) {
+    // Not in the bootloader, just pretend we sent the data to the app, but
+    // don't change our state.
+    done({bytesSent: binaryPayload.byteLength});
+
+    log(kDebugError, "FakeAvr109: No bootloader running to handle: " + binary.hexRep(payload));
+    return;
+  }
+
+  // We're in the bootloader! What should we do with this command:
+  var payload = binary.binToHex(binaryPayload);
+
+  if (arraysEqual(payload, [AVR.SOFTWARE_VERSION])) {
+    done({bytesSent: payload.length});
+    this.sendReply_(['1', '0']);
+    return;
+  }
+
+  log(kDebugError, "FakeAvr109: No handler for: " + binary.hexRep(payload));
 }
 
 // TODO(mrjones): implement modes where replies are sent in various, weird ways:
@@ -77,6 +133,7 @@ FakeAvr109.prototype.sendReply_ = function(payload) {
   for (var i = 0; i < this.listeners_.length; i++) {
     this.listeners_[i]({data: binaryPayload});
   }
+  console.log("Sent to " + this.listeners_.length + " listeners");
 }
 
 FakeAvr109.prototype.addListenerImpl_ = function(listener) {

@@ -63,6 +63,8 @@ var AVR = {
   EXIT_BOOTLOADER: 0x45,
   CR: 0x0D,
   READ_PAGE: 0x67,
+
+  MAGIC_BITRATE: 1200,
 };
 
 function Avr109Board(serial, pageSize) {
@@ -81,8 +83,6 @@ Avr109Board.prototype.init_ = function() {
   this.clock_ = new clock.RealClock;
   this.readHandler_ = null;
 }
-
-Avr109Board.MAGIC_BITRATE = 1200;
 
 Avr109Board.prototype.connectImpl_ = function(deviceName, doneCb) {
   // TODO: Validate doneCb
@@ -159,7 +159,7 @@ Avr109Board.prototype.kickBootloader_ = function(originalDeviceName, doneCb) {
 
   serial.getDevices(function(devicesArg) {
     oldDevices = devicesArg;
-    serial.connect(originalDeviceName, {bitrate: Avr109Board.MAGIC_BITRATE }, function(connectArg) {
+    serial.connect(originalDeviceName, {bitrate: AVR.MAGIC_BITRATE }, function(connectArg) {
       log(kDebugFine, "CONNECT: " + JSON.stringify(connectArg));
       serial.disconnect(connectArg.connectionId, function(disconnectArg) {
         log(kDebugFine, "DISCONNECT: " + JSON.stringify(disconnectArg));
@@ -198,6 +198,7 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
 
   var found = false;
   serial.getDevices(function(newDevices) {
+    log(kDebugFine, "WND: " + JSON.stringify(newDevices));
     var appeared = findMissingIn(newDevices, oldDevices);
     var disappeared = findMissingIn(oldDevices, newDevices);
  
@@ -237,7 +238,6 @@ Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
   }
 
   this.connectionId_ = connectArg.connectionId;
-
   // TODO: be more careful about removing this listener
   this.serialListener_ = this.readDispatcher_.bind(this);
   this.serial_.onReceive.addListener(this.serialListener_);
@@ -255,7 +255,7 @@ Avr109Board.prototype.write_ = function(payload) {
   this.serial_.send(
     this.connectionId_, hexToBin(payload), function(writeArg) {
       log(kDebugFine, "did write: " + JSON.stringify(writeArg));
-      // TODO: veridy writeArg
+      // TODO: verify writeArg
     });
 }
 

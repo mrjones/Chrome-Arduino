@@ -9,7 +9,7 @@ describe("avr109", function() {
   var fake = null;
 
   beforeEach(function() {
-    logging.setConsoleLogLevel(logging.kDebugError);
+    logging.setConsoleLogLevel(logging.kDebugFine);
     fake = new FakeAvr109(kPageSize * 10);
   });
 
@@ -19,6 +19,16 @@ describe("avr109", function() {
 
     result.board.writeFlash(0, [0x00, 0x01, 0x02], function(status) {
       assert.equal(false, status.ok());
+      done();
+    });
+  });
+
+  it("connects", function(done) {
+    var result = avr109.NewAvr109Board(fake, kPageSize);
+    assert.equal(true, result.status.ok(), result.status.toString());
+
+    result.board.connect("devicename", function(connectStatus) {
+      assert.equal(true, connectStatus.ok(), connectStatus.toString());
       done();
     });
   });
