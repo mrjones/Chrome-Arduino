@@ -20,7 +20,7 @@ var kDebugVeryFine = logging.kDebugVeryFine;
 // WriteFlash
 
 // API
-function NewAvr109Board(serial, pageSize, dispatcher) {
+function NewAvr109Board(serial, pageSize) {
   if (typeof(serial) === "undefined") {
     return { status: Status.Error("serial is undefined") }
   }
@@ -29,21 +29,62 @@ function NewAvr109Board(serial, pageSize, dispatcher) {
     return { status: Status.Error("pageSize is undefined") }
   }
 
-  if (typeof(dispatcher) === "undefined") {
-    return { status: Status.Error("dispatcher is undefined") }
-  }
-
   return { status: Status.OK,
-           board: new Avr109Board(serial, pageSize, dispatcher) };
-};
-
-function Avr109Board(serial, pageSize, dispatcher) {
-  this.serial_ = serial;
-  this.pageSize_ = pageSize;
-  this.globalDispatcher_ = dispatcher;
+           board: new Avr109Board(serial, pageSize) };
 };
 
 Avr109Board.prototype.connect = function(deviceName, doneCb) {
+  this.connectImpl_(deviceName, doneCb);
+}
+
+Avr109Board.prototype.writeFlash = function(boardAddress, data, doneCb) {
+  this.writeFlashImpl_(boardAddress, data, doneCb);
+}
+
+Avr109Board.prototype.readFlash = function(boardAddress, length, doneCb) {
+  this.readFlashImpl_(boardAddress, length, doneCb);
+}
+
+// IMPLEMENTATION
+
+Avr109Board.State = {
+  DISCONNECTED: "disconnected",
+  CONNECTING: "connecting",
+  CONNECTED: "connected"
+};
+
+var AVR = {
+  SOFTWARE_VERSION: 0x56,
+  ENTER_PROGRAM_MODE: 0x50,
+  LEAVE_PROGRAM_MODE: 0x4c,
+  SET_ADDRESS: 0x41,
+  WRITE: 0x42, // TODO: WRITE_PAGE
+  TYPE_FLASH: 0x46,
+  EXIT_BOOTLOADER: 0x45,
+  CR: 0x0D,
+  READ_PAGE: 0x67,
+};
+
+function Avr109Board(serial, pageSize) {
+  this.init_();
+
+  this.serial_ = serial;
+  this.pageSize_ = pageSize;
+};
+
+Avr109Board.prototype.init_ = function() {
+  this.serialListener_ = null;
+  this.pageSize_ = -1;
+  this.serial_ = null;
+  this.state_ = Avr109Board.State.DISCONNECTED;
+  this.connectionId_ = -1;
+  this.clock_ = new clock.RealClock;
+  this.readHandler_ = null;
+}
+
+Avr109Board.MAGIC_BITRATE = 1200;
+
+Avr109Board.prototype.connectImpl_ = function(deviceName, doneCb) {
   // TODO: Validate doneCb
   // TODO: Validate deviceName?
 
@@ -57,7 +98,7 @@ Avr109Board.prototype.connect = function(deviceName, doneCb) {
   this.kickBootloader_(deviceName, doneCb);
 };
 
-Avr109Board.prototype.writeFlash = function(boardAddress, data, doneCb) {
+Avr109Board.prototype.writeFlashImpl_ = function(boardAddress, data, doneCb) {
   if (this.state_ != Avr109Board.State.CONNECTED) {
     return doneCb(Status.Error("Not connected to board: " + this.state_));
   };
@@ -91,7 +132,7 @@ Avr109Board.prototype.writeFlash = function(boardAddress, data, doneCb) {
     });
 };
 
-Avr109Board.prototype.readFlash = function(boardAddress, length, doneCb) {
+Avr109Board.prototype.readFlashImpl_ = function(boardAddress, length, doneCb) {
   if (this.state_ != Avr109Board.State.CONNECTED) {
     doneCb({
       status: Status.Error("Not connected to board: " + this.state_) });
@@ -100,35 +141,6 @@ Avr109Board.prototype.readFlash = function(boardAddress, length, doneCb) {
       status: Status.Error("Not implemented")});
   }
 };
-
-// IMPLEMENTATION
-Avr109Board.State = {
-  DISCONNECTED: "disconnected",
-  CONNECTING: "connecting",
-  CONNECTED: "connected"
-};
-
-var AVR = {
-  SOFTWARE_VERSION: 0x56,
-  ENTER_PROGRAM_MODE: 0x50,
-  LEAVE_PROGRAM_MODE: 0x4c,
-  SET_ADDRESS: 0x41,
-  WRITE: 0x42, // TODO: WRITE_PAGE
-  TYPE_FLASH: 0x46,
-  EXIT_BOOTLOADER: 0x45,
-  CR: 0x0D,
-  READ_PAGE: 0x67,
-};
-
-Avr109Board.prototype.globalDispatcher_ = null;
-Avr109Board.prototype.pageSize_ = -1;
-Avr109Board.prototype.serial_ = null;
-Avr109Board.prototype.state_ = Avr109Board.State.DISCONNECTED;
-Avr109Board.prototype.connectionId_ = -1;
-Avr109Board.prototype.clock_ = new clock.RealClock;
-Avr109Board.prototype.readHandler_ = null;
-
-Avr109Board.MAGIC_BITRATE = 1200;
 
 Avr109Board.prototype.readDispatcher_ = function(readArg) {
   if (this.readHandler_ != null) {
@@ -226,11 +238,10 @@ Avr109Board.prototype.serialConnected_ = function(connectArg, doneCb) {
 
   this.connectionId_ = connectArg.connectionId;
 
-//  this.serial_.onReceive.addListener(this.readDispatcher_.bind(this));
   // TODO: be more careful about removing this listener
-  this.globalDispatcher_.addListener(
-    this.connectionId_,
-    this.readDispatcher_.bind(this));
+  this.serialListener_ = this.readDispatcher_.bind(this);
+  this.serial_.onReceive.addListener(this.serialListener_);
+
   this.startCheckSoftwareVersion_(doneCb);
 }
 
@@ -415,7 +426,7 @@ Avr109Board.prototype.exitBootloader_ = function(doneCb) {
       var hexData = binToHex(readArg.data);
       if (hexData.length == 1 && hexData[0] == AVR.CR) {
         // TODO: add a "disconnect" method, and call it everywhere
-        this.globalDispatcher_.removeListener(this.connectionId_);
+        this.serial_.onReceive.removeListener(this.serialListener_);
 
         // TODO: don't forget to disconnect in all the error cases (yuck)
         this.serial_.disconnect(this.connectionId_, function(disconnectArg) {
