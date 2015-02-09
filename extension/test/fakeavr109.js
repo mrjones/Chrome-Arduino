@@ -24,9 +24,11 @@ var FakeAvr109 = function(memorySize) {
 }
 
 FakeAvr109.prototype.reset_ = function() {
+  this.addressPtr_ = -1;
   this.bootloaderRunning_ = false;
   this.bootloaderPortName_ = "bootloader-port";
   this.connectionId_ = -1;
+  this.inProgmode_ = false;
   this.serialConnected_ = false;
   this.listeners_ = [];
 }
@@ -121,6 +123,82 @@ FakeAvr109.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
     this.sendReply_(['1', '0']);
     return;
   }
+
+  if (arraysEqual(payload, [AVR.ENTER_PROGRAM_MODE])) {
+    done({bytesSent: payload.length});
+    this.inProgmode_ = true;
+    this.sendReply_([AVR.CR]);
+    return;
+  }
+
+  if (arraysEqual(payload, [AVR.LEAVE_PROGRAM_MODE])) {
+    done({bytesSent: payload.length});
+    this.inProgmode_ = false;
+    this.sendReply_([AVR.CR]);
+    return;
+  }
+
+  if (arraysEqual(payload, [AVR.EXIT_BOOTLOADER])) {
+    done({bytesSent: payload.length});
+    this.bootloaderRunning_ = false;
+    this.sendReply_([AVR.CR]);
+    return;
+  }
+
+  if (hasPrefix(payload, [AVR.SET_ADDRESS]) && payload.length == 3) {
+    done({bytesSent: payload.length});
+
+    this.addressPtr_ = (payload[1] << 8) + payload[2];
+    this.sendReply_([AVR.CR]);
+    return;
+  }
+
+  if (hasPrefix(payload, [AVR.WRITE]) && payload.length > 4) {
+    var length = (payload[1] << 8) + payload[2];
+
+    if (payload.length != length + 4) {
+      log(kDebugError, "Payload length (" + payload.length + ") does not match " +
+          "encoded length (" + length + " + 4): " + binary.hexRep(payload));
+      return;
+    }
+
+    if (this.addressPtr_ + length >= this.memory_.length) {
+      log(kDebugError, "Tried to read past end of board!");
+      return;
+    }
+
+    done({bytesSent: payload.length});
+
+    // TODO(mrjones): verify that payload[3] == 'E'
+    for (var i = 0; i < length; i++) {
+      this.memory_[this.addressPtr_++] = payload[i + 4];
+    }
+
+    this.sendReply_([AVR.CR]);
+    return;
+  }
+
+  if (hasPrefix(payload, [AVR.READ_PAGE]) && payload.length == 4) {
+    console.log("READPAGE");
+    // TODO(mrjones): verify that payload[3] == 'E'
+    var length = (payload[1] << 8) + payload[2];
+
+    if (this.addressPtr_ + length >= this.memory_.length) {
+      log(kDebugError, "Tried to read past end of board!");
+      return;
+    }
+
+    done({bytesSent: payload.length});
+
+    var result = new Array(length);
+    for (var i = 0; i < length; i++) {
+      result[i] = this.memory_[this.addressPtr_++];
+    }
+
+    this.sendReply_(result);
+
+    return;
+  };
 
   log(kDebugError, "FakeAvr109: No handler for: " + binary.hexRep(payload));
 }

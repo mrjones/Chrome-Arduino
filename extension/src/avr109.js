@@ -365,9 +365,9 @@ Avr109Board.prototype.beginVerification_ = function(boardAddress, data, doneCb) 
 
 Avr109Board.prototype.verifyPage_ = function(pageNo, data, doneCb) {
   var numPages = data.length / this.pageSize_;
-  if (pageNo == 0 || pageNo == numPages - 1 || (pageNo + 1) % 5 == 0) {
+//  if (pageNo == 0 || pageNo == numPages - 1 || (pageNo + 1) % 5 == 0) {
     log(kDebugFine, "Verifying page " + (pageNo + 1) + " of " + numPages);
-  }
+//  }
 
   var board = this;
   var pageSize = this.pageSize_;
@@ -430,7 +430,7 @@ Avr109Board.prototype.exitBootloader_ = function(doneCb) {
 
         // TODO: don't forget to disconnect in all the error cases (yuck)
         this.serial_.disconnect(this.connectionId_, function(disconnectArg) {
-            doneCb(Status.OK);
+          doneCb(Status.OK);
         });
       } else {
         doneCb(Status.Error("Error leaving bootloader: " + hexRep(hexData)));
