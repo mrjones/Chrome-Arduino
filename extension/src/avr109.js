@@ -428,3 +428,4 @@ Avr109Board.prototype.exitBootloader_ = function(doneCb) {
 }
 
 exports.NewAvr109Board = NewAvr109Board;
+exports.AVR = AVR;
