@@ -211,7 +211,7 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
     if (appeared.length == 0) {
       setTimeout(function() {
         board.waitForNewDevice_(newDevices, doneCb, deadline);
-      }, 10);
+      }, 100);
     } else {
       log(kDebugNormal, "Aha! Connecting to: " + appeared[0]);
       // I'm not 100% sure why we need this setTimeout
