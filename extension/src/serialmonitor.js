@@ -1,4 +1,4 @@
-var uploader = require("./uploader.js");
+var upload = require("./uploader.js");
 var logging = require("./logging.js");
 
 var log = logging.log;
@@ -77,6 +77,7 @@ function uploadButtonPressed() {
   var urlBox = document.getElementById("sketch_url");
   var url = urlBox.value;
 
+  var uploader = new upload.Uploader();
   uploader.uploadSketch(selectedPort, protocol, url);
 }
 
