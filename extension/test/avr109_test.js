@@ -19,7 +19,7 @@ describe("avr109", function() {
   var fake = null;
 
   beforeEach(function() {
-    logging.setConsoleLogLevel(logging.kDebugFine);
+    logging.setConsoleLogLevel(logging.kDebugError);
     fake = new FakeAvr109(kPageSize * 10);
   });
 
@@ -54,6 +54,14 @@ describe("avr109", function() {
 
       result.board.writeFlash(0, genPayload(kPayloadSize), function(writeStatus) {
         assert.equal(true, writeStatus.ok(), writeStatus.toString());
+
+        for (var i = 0; i < kPayloadSize; ++i) {
+          assert.equal(
+            payloadPattern[i % payloadPattern.length],
+            fake.memory_[i],
+            "Mismatched byte at offset: " + i + ". Expected:  " +
+              payloadPattern[i % payloadPattern.length] + ", Actual: " + fake.memory_[i]);
+        }
 
         done();
       });

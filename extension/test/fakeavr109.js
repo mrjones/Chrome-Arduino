@@ -179,7 +179,6 @@ FakeAvr109.prototype.sendImpl_ = function(connectionId, binaryPayload, done) {
   }
 
   if (hasPrefix(payload, [AVR.READ_PAGE]) && payload.length == 4) {
-    console.log("READPAGE");
     // TODO(mrjones): verify that payload[3] == 'E'
     var length = (payload[1] << 8) + payload[2];
 
@@ -211,7 +210,6 @@ FakeAvr109.prototype.sendReply_ = function(payload) {
   for (var i = 0; i < this.listeners_.length; i++) {
     this.listeners_[i]({data: binaryPayload});
   }
-  console.log("Sent to " + this.listeners_.length + " listeners");
 }
 
 FakeAvr109.prototype.addListenerImpl_ = function(listener) {

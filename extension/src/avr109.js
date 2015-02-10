@@ -117,7 +117,6 @@ Avr109Board.prototype.writeFlashImpl_ = function(boardAddress, data, doneCb) {
         + (data.length % this.pageSize_) + ")"));
   }
 
-  console.log(kDebugFine, "Entering program mode");
   var board = this;
   this.writeAndGetReply_(
     [AVR.ENTER_PROGRAM_MODE],
@@ -293,7 +292,7 @@ Avr109Board.prototype.finishCheckSoftwareVersion_ = function(readArg, doneCb) {
 
 
 Avr109Board.prototype.beginProgramming_ = function(boardAddress, data, doneCb) {
-  console.log(kDebugFine, "Begin programming.");
+  log(kDebugFine, "Begin programming.");
   var board = this;
   var addressBytes = storeAsTwoBytes(boardAddress);
   this.writeAndGetReply_(
@@ -310,7 +309,7 @@ Avr109Board.prototype.beginProgramming_ = function(boardAddress, data, doneCb) {
 }
 
 Avr109Board.prototype.writePage_ = function(pageNo, data, doneCb) {
-  console.log(kDebugFine, "Write page");
+  log(kDebugFine, "Write page");
   var numPages = data.length / this.pageSize_;
   if (pageNo == 0 || pageNo == numPages - 1 || (pageNo + 1) % 5 == 0) {
     log(kDebugFine, "Writing page " + (pageNo + 1) + " of " + numPages);
