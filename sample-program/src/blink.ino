@@ -2,6 +2,7 @@
 
 void setup()
 {
+    Serial.begin(9600);      // open the serial port at 9600 bps:    
     pinMode(LED_PIN, OUTPUT);
 }
 
@@ -19,4 +20,6 @@ void loop()
     delay(100);
     digitalWrite(LED_PIN, LOW);
     delay(1000);
+
+    Serial.println("blink");
 }

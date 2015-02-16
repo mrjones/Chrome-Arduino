@@ -159,6 +159,9 @@ function disconnect() {
     log(kDebugNormal, "Can't disconnect: Already disconnected!");
     return;
   }
+  log(kDebugFine, "Removing listener");
+  chrome.serial.onReceive.removeListener(readHandler);
+
   chrome.serial.disconnect(connectionId_, disconnectDone);
 }
 
@@ -203,15 +206,4 @@ function readHandler(readArg) {
   str.replace("\n", "<br/>");
   // XSS like woah, but who cares.
   document.getElementById("fromdevice_data").innerHTML += str;
-}
-
-
-// UNUSED RIGHT NOW//
-
-function onSerialDisconnect(disconnectArg) {
-  log(kDebugFine, "ON DISCONNECT: " + JSON.stringify(disconnectArg));
-}
-
-function onSerialFlush(flushArg) {
-  log(kDebugFine, "ON FLUSH: " + JSON.stringify(flushArg));
 }
