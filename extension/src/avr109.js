@@ -5,6 +5,7 @@ var binary = require("./binary.js");
 
 var hexToBin = binary.hexToBin;
 var binToHex = binary.binToHex;
+var hexRep = binary.hexRep;
 var storeAsTwoBytes = binary.storeAsTwoBytes;
 
 var log = logging.log;
@@ -126,7 +127,7 @@ Avr109Board.prototype.writeFlashImpl_ = function(boardAddress, data, doneCb) {
         board.beginProgramming_(boardAddress, data, doneCb)
       } else {
         return doneCb(Status.Error(
-          "Error entering program mode: " + hexRep(response)));
+          "Error entering program mode: " + hexRep(hexResponse)));
       }
     });
 };
