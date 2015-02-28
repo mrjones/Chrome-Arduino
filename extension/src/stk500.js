@@ -290,7 +290,7 @@ Stk500Board.prototype.writeFlashImpl_ = function(boardAddress, data, doneCb) {
         board.writePage_(boardAddress, data, 0, doneCb)
       } else {
         return doneCb(Status.Error(
-          "Error entering program mode: " + hexRep(response)));
+          "Error entering program mode: " + hexRep(d)));
       }
     });
 }
