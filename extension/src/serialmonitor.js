@@ -9,6 +9,7 @@ var log = logging.log;
 var kDebugError = logging.kDebugError;
 var kDebugNormal = logging.kDebugNormal;
 var kDebugFine = logging.kDebugFine;
+var kDebugVeryFine = logging.kDebugVeryFine;
 
 var kBitrate = 9600; // TODO(mrjones): make a UI option
 var kUnconnected = -1;
@@ -29,44 +30,40 @@ var ids = {
   logLevelMenu: "log_level_picker"
 };
 
-logging.configureVisibleLogging(ids.statusText);
 
-log(kDebugFine, "-- BEGIN --");
-document.getElementById("todevice_send")
-  .addEventListener('click', sendDataToDevice);
+var init = function() {
+  logging.configureVisibleLogging(ids.statusText);
 
-document.getElementById(ids.refreshDevicesButton)
-  .addEventListener('click', detectDevices);
+  detectDevices();
 
-document.getElementById(ids.connectButton)
-  .addEventListener('click', connectToSelectedSerialPort);
+  log(kDebugFine, "-- BEGIN --");
+  document.getElementById("todevice_send")
+    .addEventListener('click', sendDataToDevice);
 
-document.getElementById(ids.disconnectButton)
-  .addEventListener('click', disconnect);
+  document.getElementById(ids.refreshDevicesButton)
+    .addEventListener('click', detectDevices);
 
-document.getElementById(ids.clearButton)
-  .addEventListener('click', clearSerialMonitor);
+  document.getElementById(ids.connectButton)
+    .addEventListener('click', connectToSelectedSerialPort);
 
-document.getElementById(ids.sendText)
-  .addEventListener('keydown', doOnEnter(sendDataToDevice));
+  document.getElementById(ids.disconnectButton)
+    .addEventListener('click', disconnect);
 
-document.getElementById(ids.uploaderButton)
-  .addEventListener('click', uploadButtonPressed);
+  document.getElementById(ids.clearButton)
+    .addEventListener('click', clearSerialMonitor);
 
-document.getElementById(ids.logLevelMenu)
-  .addEventListener('change', logLevelChanged);
+  document.getElementById(ids.sendText)
+    .addEventListener('keydown', doOnEnter(sendDataToDevice));
 
-//document.getElementById("test_fetch")
-//  .addEventListener('click', testFetch);
+  document.getElementById(ids.uploaderButton)
+    .addEventListener('click', uploadButtonPressed);
 
-document.getElementById(ids.disconnectButton).disabled = true;
-document.getElementById(ids.sendButton).disabled = true;
+  document.getElementById(ids.logLevelMenu)
+    .addEventListener('change', logLevelChanged);
 
-//function testFetch() {
-//    fetchProgram("http://linode.mrjon.es/blink.hex", function(data) {
-//        log(kDebugFine, "Got data!");
-//    });
-//}
+  document.getElementById(ids.disconnectButton).disabled = true;
+  document.getElementById(ids.sendButton).disabled = true;
+}
 
 function logLevelChanged() {
   var logLevelMenu = document.getElementById(ids.logLevelMenu);
@@ -115,8 +112,6 @@ function detectDevices() {
   });
   return false; // Don't submit the form
 }
-
-detectDevices();
 
 function sendDataToDevice() {
   if (connectionId_ == kUnconnected) {
@@ -214,9 +209,15 @@ function binaryToString(buffer) {
 function readHandler(readArg) {
   log(kDebugFine, "ON READ:" + JSON.stringify(readArg));
   // TODO: check connection id
-  var str = binaryToString(readArg.data);
-  log(kDebugFine, str);
-  str = str.replace("\n", "<br/>");
   // XSS like woah, but who cares.
-  document.getElementById("fromdevice_data").innerHTML += str;
+  document.getElementById("fromdevice_data").innerHTML +=
+    serialDataToHtml(binaryToString(readArg.data));
 }
+
+function serialDataToHtml(serialData) {
+  log(kDebugVeryFine, ">> " + serialData);
+  return serialData.replace(/\n/g, "<br/>");
+}
+
+exports.init = init;
+exports.serialDataToHtml_forTest = serialDataToHtml;
