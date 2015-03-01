@@ -20,3 +20,6 @@ Build and Test
 `cd` to /extension and run `./build.sh` and `./test.sh`
 
 
+License
+=======
+This software is released under the terms of [Mozilla Public License v2.0](http://www.mozilla.org/MPL/2.0/).

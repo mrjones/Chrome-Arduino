@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 var assert = require("assert")
 var stk500 = require("../src/stk500.js")
 var FakeStk500 = require("./fakestk500.js").FakeStk500;
@@ -17,9 +21,6 @@ var genPayload = function(length) {
 describe("stk500", function() {
   var kPageSize = 128;
   var fake = null;
-
-  before(function() {
-  });
 
   beforeEach(function() {
     logging.setConsoleLogLevel(logging.kDebugError);
@@ -57,7 +58,6 @@ describe("stk500", function() {
       result.board.writeFlash(0, genPayload(kPayloadSize), function(writeStatus) {
         assert.equal(true, writeStatus.ok(), writeStatus.toString());
 
-        // TODO(mrjones): Ideally we'd do this via readFlash.
         for (var i = 0; i < kPayloadSize; ++i) {
           assert.equal(
             payloadPattern[i % payloadPattern.length],
