@@ -208,20 +208,21 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
       log(kDebugFine, "Appeared: " + appeared[i]);
     }
 
-    if (appeared.length == 0) {
+    if (appeared.length == 0 && disappeared.length == 0 ) {
       setTimeout(function() {
         board.waitForNewDevice_(newDevices, doneCb, deadline);
       }, 100);
     } else {
-      log(kDebugNormal, "Aha! Connecting to: " + appeared[0]);
+      var device = appeared[0] ? appeared[0] : disappeared[0];
+      log(kDebugNormal, "Aha! Connecting to: " + device);
       // I'm not 100% sure why we need this setTimeout
       setTimeout(function() {
         log(kDebugFine, "Reconnecting...");
-        serial.connect(appeared[0], { bitrate: 57600 }, function(connectArg) {
+        serial.connect(device, { bitrate: 57600 }, function(connectArg) {
           
           board.serialConnected_(connectArg, doneCb);
         });
-      }, 500);
+      }, 3000);
     }
   });
 }
@@ -413,7 +414,7 @@ Avr109Board.prototype.exitProgramMode_ = function(doneCb) {
       if (hexData.length == 1 && hexData[0] == AVR.CR) {
         board.exitBootloader_(doneCb);
       } else {
-        doneCb(Status.Error("Error leaving progam mode: " + hexRep(hexData)));
+        doneCb(Status.Error("Error leaving program mode: " + hexRep(hexData)));
       }
     });
 };
