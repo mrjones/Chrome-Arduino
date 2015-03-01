@@ -19,6 +19,7 @@ var connectionId_ = kUnconnected;
 var ids = {
   connectButton: "connect",
   disconnectButton: "disconnect",
+  clearButton: "clear_button",
   refreshDevicesButton: "devices_refresh",
   refreshDevicesMenu: "devices_menu",
   sendText: "todevice_data",
@@ -42,6 +43,9 @@ document.getElementById(ids.connectButton)
 
 document.getElementById(ids.disconnectButton)
   .addEventListener('click', disconnect);
+
+document.getElementById(ids.clearButton)
+  .addEventListener('click', clearSerialMonitor);
 
 document.getElementById(ids.sendText)
   .addEventListener('keydown', doOnEnter(sendDataToDevice));
@@ -169,6 +173,10 @@ function disconnect() {
   chrome.serial.disconnect(connectionId_, disconnectDone);
 }
 
+function clearSerialMonitor() {
+  document.getElementById("fromdevice_data").innerHTML = "";
+}
+
 function doSend() {
   var input = document.getElementById("todevice_data");
   var data = input.value;
@@ -207,7 +215,8 @@ function readHandler(readArg) {
   log(kDebugFine, "ON READ:" + JSON.stringify(readArg));
   // TODO: check connection id
   var str = binaryToString(readArg.data);
-  str.replace("\n", "<br/>");
+  log(kDebugFine, str);
+  str = str.replace("\n", "<br/>");
   // XSS like woah, but who cares.
   document.getElementById("fromdevice_data").innerHTML += str;
 }
