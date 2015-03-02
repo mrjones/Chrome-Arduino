@@ -1,4 +1,4 @@
-var ParseHexFile = require("./hexparser.js").ParseHexFile;
+var IntelHEX = require("./intelhex.js").IntelHEX
 var logging = require("./logging.js");
 var stk500 = require("./stk500.js");
 var avr109 = require("./avr109.js");
@@ -42,10 +42,13 @@ Uploader.prototype.fetchProgram_ = function(url, handler) {
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
       if (xhr.status == 200) {
-        var programBytes = ParseHexFile(xhr.responseText);
-        log(kDebugFine, "Fetched Data:\n" + xhr.responseText);
-//        log(kDebugFine, "Program Data: " + xhr.responseText.substring(0,25) + "...");
-        handler(programBytes);
+        var programBytes = new IntelHEX(xhr.responseText).parse();
+        if (programBytes != "FAIL") {
+          log(kDebugFine, "Fetched Data:\n" + xhr.responseText);
+          handler(programBytes);
+        } else {
+          log(kDebugFine, "Data parse failed.");
+        }
       } else {
         log(kDebugError, "Bad fetch: " + xhr.status);
       }
