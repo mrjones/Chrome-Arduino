@@ -164,12 +164,15 @@ Avr109Board.prototype.kickBootloader_ = function(originalDeviceName, doneCb) {
   serial.getDevices(function(devicesArg) {
     oldDevices = devicesArg;
     serial.connect(originalDeviceName, {bitrate: AVR.MAGIC_BITRATE }, function(connectArg) {
-      log(kDebugFine, "CONNECT: " + JSON.stringify(connectArg));
-      serial.disconnect(connectArg.connectionId, function(disconnectArg) {
-        log(kDebugFine, "DISCONNECT: " + JSON.stringify(disconnectArg));
-        board.waitForNewDevice_(
-          oldDevices, doneCb, board.clock_.nowMillis() + 1000);
-      });
+      setTimeout(function() {
+        log(kDebugFine, "CONNECT: " + JSON.stringify(connectArg));
+
+        serial.disconnect(connectArg.connectionId, function(disconnectArg) {
+          log(kDebugFine, "DISCONNECT: " + JSON.stringify(disconnectArg));
+          board.waitForNewDevice_(
+            oldDevices, doneCb, board.clock_.nowMillis() + 1000);
+        });
+      }, 100);
     });
   });
 }
