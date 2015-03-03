@@ -222,7 +222,7 @@ Avr109Board.prototype.waitForNewDevice_ = function(oldDevices, doneCb, deadline)
           
           board.serialConnected_(connectArg, doneCb);
         });
-      }, 3000);
+      }, 2000);
     }
   });
 }
