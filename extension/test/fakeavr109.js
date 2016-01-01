@@ -19,7 +19,7 @@ var FakeAvr109 = function(memorySize) {
   this.onReceive.addListener = this.addListenerImpl_.bind(this);
   this.onReceive.removeListener = this.removeListenerImpl_.bind(this);
 
-  this.reset_();
+  this.reset_(false);
   this.nextConnectionId_ = 57;
   this.memory_ = new Array(memorySize);
   for (var i = 0; i < memorySize; i++) {
@@ -27,9 +27,9 @@ var FakeAvr109 = function(memorySize) {
   }
 }
 
-FakeAvr109.prototype.reset_ = function() {
+FakeAvr109.prototype.reset_ = function(bootloaderRunning) {
   this.addressPtr_ = -1;
-  this.bootloaderRunning_ = false;
+  this.bootloaderRunning_ = bootloaderRunning;
   this.bootloaderPortName_ = "bootloader-port";
   this.connectionId_ = -1;
   this.inProgmode_ = false;
@@ -85,19 +85,19 @@ FakeAvr109.prototype.connectImpl_ = function(deviceName, options, done) {
     // Connected to the bootloader
     done({connectionId: this.connectionId_});
   } else {
-    // Just a normal connection
-    done({connectionId: this.connectionId_});
-
     if (typeof(options.bitrate) != "undefined" && options.bitrate == AVR.MAGIC_BITRATE) {
       log(kDebugFine, "FakeA109: Launching bootloader");
       this.bootloaderRunning_ = true;
     }
+
+    // Just a normal connection
+    done({connectionId: this.connectionId_});
   }
 }
 
 FakeAvr109.prototype.disconnectImpl_ = function(connectionId, done) {
   if (this.connectionId_ == connectionId) {
-    this.reset_();
+    this.reset_(this.bootloaderRunning_);
     done(true);
   } else {
     done(false); 
